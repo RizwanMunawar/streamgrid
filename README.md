@@ -2,13 +2,13 @@
 
 **Ultra-fast multi-stream video display** - Display multiple video sources simultaneously with minimal CPU usage.
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install streamgrid
 ```
 
-## 🎯 Quick Start
+## Quick Start
 
 ### Command Line
 
@@ -33,7 +33,7 @@ grid = StreamGrid(['video1.mp4', 'video2.mp4', 0])
 grid.run()
 ```
 
-## 📊 Performance
+## Performance
 
 StreamGrid automatically optimizes performance:
 
@@ -42,6 +42,6 @@ StreamGrid automatically optimizes performance:
 - **5-9 streams**: 320x180 cells, up to 5 FPS each
 - **10+ streams**: 240x135 cells, up to 3 FPS each
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.
