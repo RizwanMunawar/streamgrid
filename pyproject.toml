@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "streamgrid"
 version = "1.0.0"
-description = "Ultra-fast multi-stream video display - no AI processing, just pure speed"
+description = "Ultra-fast multi-stream video display"
 authors = [
     {name = "Muhammad Rizwan Munawar"}
 ]
@@ -14,7 +14,7 @@ license = {text = "MIT"}
 requires-python = ">=3.8"
 keywords = ["video", "streaming", "display", "multi-stream", "opencv", "real-time", "python"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 1 - Planning",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",

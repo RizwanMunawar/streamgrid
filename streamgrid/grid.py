@@ -14,13 +14,7 @@ class StreamGrid:
     """Ultra-fast multi-stream video display."""
 
     def __init__(self, sources: List[Union[str, int]], fps: int = 10):
-        """
-        Initialize StreamGrid.
-
-        Args:
-            sources: List of video sources
-            fps: Target FPS for all streams
-        """
+        """Initialize StreamGrid."""
         self.sources = sources
         self.num_streams = len(sources)
         self.fps = fps
