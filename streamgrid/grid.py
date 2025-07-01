@@ -25,11 +25,11 @@ class StreamGrid:
 
         # Auto cell size based on stream count
         if self.num_streams <= 4:
-            cell_size = (640, 360)
+            cell_size = (1280, 720)
         elif self.num_streams <= 9:
-            cell_size = (480, 270)
+            cell_size = (640, 360)
         else:
-            cell_size = (320, 180)
+            cell_size = (480, 270)
 
         self.cell_size = cell_size
         self.grid_shape = (rows, cols)
