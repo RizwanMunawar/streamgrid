@@ -5,7 +5,9 @@
 ## Installation
 
 ```bash
-pip install streamgrid
+pip install -e . 
+
+pip install streamgrid  # in future
 ```
 
 ## Quick Start
