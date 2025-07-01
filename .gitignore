@@ -11,7 +11,7 @@ downloads/
 eggs/
 .eggs/
 lib/
-.streamgrid.egg-info/
+streamgrid.egg-info/
 wheels/
 pip-wheel-metadata/
 share/python-wheels/
