@@ -12,8 +12,12 @@ import numpy as np
 class VideoStream:
     """Single video stream with optional YOLO."""
 
-    def __init__(self, source: Union[str, int], fps: int, cell_size: Tuple[int, int],
-                 stream_id: int = 0, yolo_processor=None):
+    def __init__(self,
+                 source: Union[str, int],
+                 fps: int,
+                 cell_size: Tuple[int, int],
+                 stream_id: int = 0,
+                 yolo_processor=None):
         self.source = source
         self.fps = fps
         self.cell_size = cell_size
@@ -32,6 +36,9 @@ class VideoStream:
         self.detection_count = 0
         self.last_yolo_time = 0
         self.yolo_interval = 0.2  # Process for YOLO every 200ms (5fps max)
+        # FPS tracking
+        self.frame_times = []
+        self.fps_window_size = 30  # Calculate FPS over last 30 frames
 
     def start(self):
         """Start video capture."""
@@ -65,6 +72,11 @@ class VideoStream:
             resized_frame = cv2.resize(frame, self.cell_size)
             self.current_frame = resized_frame
             self.last_time = current_time
+
+            # Track FPS
+            self.frame_times.append(current_time)
+            if len(self.frame_times) > self.fps_window_size:
+                self.frame_times.pop(0)
 
             # Send to YOLO processing (throttled and non-blocking)
             if (self.yolo_processor and
@@ -101,3 +113,10 @@ class VideoStream:
     def is_active(self):
         """Check if stream is still active."""
         return self.running and self.thread and self.thread.is_alive()
+
+    def get_actual_fps(self) -> float:
+        """Get actual FPS of this stream."""
+        if len(self.frame_times) < 2:
+            return 0.0
+        time_diff = self.frame_times[-1] - self.frame_times[0]
+        return (len(self.frame_times) - 1) / time_diff if time_diff > 0 else 0.0

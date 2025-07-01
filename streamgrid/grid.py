@@ -14,7 +14,12 @@ from .yolo import stop_yolo
 class StreamGrid:
     """Ultra-fast multi-stream video display with optional YOLO."""
 
-    def __init__(self, sources: List[Union[str, int]], fps: int = 10, model=None, confidence: float = 0.25):
+    def __init__(self,
+                 sources: List[Union[str, int]],
+                 fps: int = 10,
+                 model=None,
+                 confidence: float = 0.25,
+                 batch: int = 4):
         """Initialize StreamGrid.
 
         Args:
@@ -25,9 +30,10 @@ class StreamGrid:
         """
         self.sources = sources
         self.num_streams = len(sources)
-        self.fps = fps
+        self.fps = fps / self.num_streams
         self.model = model
         self.confidence = confidence
+        self.batch_size = batch_size = batch
 
         # Calculate grid layout
         cols = int(math.ceil(math.sqrt(self.num_streams)))
@@ -35,11 +41,11 @@ class StreamGrid:
 
         # Auto cell size based on stream count
         if self.num_streams <= 4:
-            cell_size = (1280, 720)
-        elif self.num_streams <= 9:
             cell_size = (640, 360)
-        else:
+        elif self.num_streams <= 9:
             cell_size = (480, 270)
+        else:
+            cell_size = (360, 180)
 
         self.cell_size = cell_size
         self.grid_shape = (rows, cols)
@@ -48,7 +54,7 @@ class StreamGrid:
         self.yolo_processor = None
         if self.model:
             from .yolo import get_yolo_processor
-            self.yolo_processor = get_yolo_processor(self.model, self.confidence)
+            self.yolo_processor = get_yolo_processor(self.model, self.confidence, self.batch_size)
 
         # Initialize
         self.streams = []
@@ -60,8 +66,8 @@ class StreamGrid:
         self.start_time = None
         self.frame_count = 0
 
-        yolo_info = f" + YOLO({model.__class__.__name__ if model else 'None'})" if model else ""
-        print(f"StreamGrid: {self.num_streams} streams @ {fps}fps, {cell_size}{yolo_info}")
+        yolo_info = f" + YOLO(batch={batch_size})" if model else ""
+        print(f"StreamGrid: {self.num_streams} streams @ {self.fps}fps, {cell_size}{yolo_info}")
 
     def run(self):
         """Start and run StreamGrid."""
@@ -123,8 +129,8 @@ class StreamGrid:
 
             # Add detection count if YOLO enabled
             if self.model and self.show_stats:
-                detection_count = stream.get_detection_count()
-                info_text = f"S{i}: {detection_count} objs"
+                # detection_count = stream.get_detection_count()
+                info_text = f"STREAM #{i}"
                 cv2.putText(frame, info_text, (5, 20),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
@@ -142,33 +148,48 @@ class StreamGrid:
         if not self.start_time:
             return
 
-        elapsed = time.time() - self.start_time
-        display_fps = self.frame_count / elapsed if elapsed > 0 else 0
-
-        # Stats background
-        cv2.rectangle(self.grid_image, (10, 10), (250, 80), (0, 0, 0), -1)
-        cv2.rectangle(self.grid_image, (10, 10), (250, 80), (255, 255, 255), 1)
+        # Calculate total system throughput (all active streams combined)
+        active_streams = [s for s in self.streams if s.is_active()]
+        total_fps = sum(s.get_actual_fps() for s in active_streams)
+        avg_per_stream = total_fps / len(active_streams) if active_streams else 0.0
 
         # Stats text
         stats = [
-            f"Display FPS: {display_fps:.1f}",
+            f"Average FPS: {avg_per_stream:.1f}",
             f"Streams: {self.num_streams}",
-            f"YOLO: {'ON' if self.model else 'OFF'}"
         ]
 
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        thickness = 2
+        padding = 15
+        line_height = 20
+
+        # Calculate the max text width and total height
+        text_sizes = [cv2.getTextSize(text, font, font_scale, thickness)[0] for text in stats]
+        max_width = max(w for w, h in text_sizes)
+        total_height = len(stats) * line_height
+
+        # Top-left corner of the rectangle
+        x, y = 10, 10
+        rect_width = max_width + 2 * padding
+        rect_height = total_height + 2 * padding
+
+        # Draw background rectangle
+        cv2.rectangle(self.grid_image, (x, y), (x + rect_width, y + rect_height), (0, 0, 0), -1)
+        # cv2.rectangle(self.grid_image, (x, y), (x + rect_width, y + rect_height), (255, 255, 255), 1)
+
+        # Draw text
         for i, text in enumerate(stats):
-            cv2.putText(self.grid_image, text, (15, 35 + i * 20),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            text_x = x + padding
+            text_y = y + padding + (i + 1) * line_height - 5
+            cv2.putText(self.grid_image, text, (text_x, text_y), font, font_scale, (0, 255, 0), thickness)
 
     def stop(self):
         """Stop all streams."""
         self.running = False
         for stream in self.streams:
             stream.stop()
-
-        # Stop global YOLO detector
-        if self.enable_yolo:
-            stop_yolo()
 
         cv2.destroyAllWindows()
         print("StreamGrid stopped")

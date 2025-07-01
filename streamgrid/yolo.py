@@ -9,22 +9,26 @@ import cv2
 
 
 class YOLOProcessor:
-    """YOLO processor that uses user's model instance"""
+    """YOLO processor that uses user's model instance with CPU batch processing"""
 
-    def __init__(self, model, confidence: float = 0.25):
+    def __init__(self, model, confidence: float = 0.25, batch_size: int = 4):
         """Initialize with user's YOLO model."""
         self.model = model
         self.confidence = confidence
+        self.batch_size = batch_size
 
-        # Separate queues for each stream to avoid mixing results
-        self.frame_queues = {}  # stream_id -> queue
-        self.result_cache = {}  # stream_id -> latest result
+        # Batch processing for CPU efficiency
+        self.frame_buffer = {}      # stream_id -> latest frame
+        self.result_cache = {}      # stream_id -> latest result
+        self.batch_queue = []       # Frames ready for batch processing
+        self.batch_metadata = []    # Corresponding stream IDs
 
         # Processing thread
         self.running = False
         self.thread = None
 
-        print(f"YOLO processor initialized with model: {model.model_name if hasattr(model, 'model_name') else 'Custom'}")
+        print(f"YOLO processor initialized with CPU batch processing (batch_size={batch_size})")
+        print(f"Model: {model.model_name if hasattr(model, 'model_name') else 'Custom'}")
 
     def start(self):
         """Start YOLO processing."""
@@ -37,49 +41,95 @@ class YOLOProcessor:
         return True
 
     def _process_loop(self):
-        """Main processing loop - handles all streams independently."""
+        """CPU-optimized batch processing loop."""
         while self.running:
             try:
-                # Process frames from all streams
-                for stream_id, queue in list(self.frame_queues.items()):
-                    try:
-                        # Get the latest frame, skip old ones
-                        frame = None
-                        frame_count = 0
+                # Collect frames for batch processing
+                self._collect_batch()
 
-                        # Drain queue to get latest frame
-                        while not queue.empty() and frame_count < 5:
-                            try:
-                                frame = queue.get_nowait()
-                                frame_count += 1
-                            except Empty:
-                                break
-
-                        if frame is not None:
-                            # Use user's model with predict method
-                            results = self.model.predict(frame, conf=self.confidence, verbose=False)
-
-                            # Draw detections
-                            annotated_frame = self._draw_detections(frame, results[0])
-
-                            # Update result cache
-                            self.result_cache[stream_id] = {
-                                'frame': annotated_frame,
-                                'detections': len(results[0].boxes) if results[0].boxes is not None else 0,
-                                'timestamp': time.time()
-                            }
-
-                    except Exception as e:
-                        if self.running:
-                            print(f"YOLO processing error for stream {stream_id}: {e}")
-
-                # Small sleep to prevent CPU spinning
-                time.sleep(0.001)
+                # Process batch if we have enough frames
+                if len(self.batch_queue) >= self.batch_size:
+                    self._process_batch()
+                elif len(self.batch_queue) > 0:
+                    # Process remaining frames after a timeout
+                    time.sleep(0.05)  # 50ms timeout
+                    if len(self.batch_queue) > 0:  # Still have frames
+                        self._process_batch()
+                else:
+                    time.sleep(0.01)  # Wait for frames
 
             except Exception as e:
                 if self.running:
-                    print(f"YOLO processing error: {e}")
+                    print(f"YOLO batch processing error: {e}")
                 time.sleep(0.1)
+
+    def _collect_batch(self):
+        """Collect frames from buffer into batch queue."""
+        # Get latest frame from each stream that has new data
+        for stream_id, frame_data in list(self.frame_buffer.items()):
+            if frame_data and len(self.batch_queue) < self.batch_size * 2:  # Limit queue size
+                # Check if this frame is newer than what we already have in batch
+                already_in_batch = any(meta['stream_id'] == stream_id for meta in self.batch_metadata)
+                if not already_in_batch:
+                    self.batch_queue.append(frame_data['frame'])
+                    self.batch_metadata.append({
+                        'stream_id': stream_id,
+                        'timestamp': frame_data['timestamp']
+                    })
+                    # Clear from buffer to avoid reprocessing
+                    self.frame_buffer[stream_id] = None
+
+    def _process_batch(self):
+        """Process collected batch of frames."""
+        if not self.batch_queue:
+            return
+
+        try:
+            batch_frames = self.batch_queue[:self.batch_size]
+            batch_meta = self.batch_metadata[:self.batch_size]
+
+            # Clear processed items from queues
+            self.batch_queue = self.batch_queue[self.batch_size:]
+            self.batch_metadata = self.batch_metadata[self.batch_size:]
+
+            # CPU batch processing - handle different sizes
+            if len(batch_frames) == 1:
+                results = self.model.predict(batch_frames[0], conf=self.confidence, verbose=False)
+            else:
+                # Process batch individually (YOLO handles batching internally)
+                results = self.model.predict(batch_frames, conf=self.confidence, verbose=False)
+
+            # Ensure results is a list
+            if not isinstance(results, list):
+                results = [results]
+
+            # Process results and update cache
+            for i, (result, meta) in enumerate(zip(results, batch_meta)):
+                if i >= len(results):
+                    break
+
+                annotated_frame = self._draw_detections(batch_frames[i], result)
+
+                self.result_cache[meta['stream_id']] = {
+                    'frame': annotated_frame,
+                    'detections': len(result.boxes) if result.boxes is not None else 0,
+                    'timestamp': time.time()
+                }
+
+            # Print batch processing stats occasionally
+            if hasattr(self, '_batch_count'):
+                self._batch_count += 1
+            else:
+                self._batch_count = 1
+
+            if self._batch_count % 20 == 0:  # Every 20 batches
+                print(f"Processed batch #{self._batch_count}, size: {len(batch_frames)}")
+
+        except Exception as e:
+            print(f"Batch processing error: {e}")
+            # Clear problematic batch
+            self.batch_queue.clear()
+            self.batch_metadata.clear()
 
     def _draw_detections(self, frame: np.ndarray, result) -> np.ndarray:
         """Draw YOLO detections on frame."""
@@ -111,26 +161,16 @@ class YOLOProcessor:
         return annotated
 
     def add_frame(self, stream_id: int, frame: np.ndarray) -> bool:
-        """Add frame for processing."""
+        """Add frame to buffer for batch processing."""
         if not self.running:
             return False
 
-        # Create queue for new stream
-        if stream_id not in self.frame_queues:
-            self.frame_queues[stream_id] = Queue(maxsize=2)
-
-        try:
-            # If queue is full, remove old frame first
-            if self.frame_queues[stream_id].full():
-                try:
-                    self.frame_queues[stream_id].get_nowait()
-                except Empty:
-                    pass
-
-            self.frame_queues[stream_id].put_nowait(frame)
-            return True
-        except:
-            return False
+        # Store latest frame from each stream
+        self.frame_buffer[stream_id] = {
+            'frame': frame,
+            'timestamp': time.time()
+        }
+        return True
 
     def get_result(self, stream_id: int) -> Optional[Dict]:
         """Get latest result for specific stream."""
@@ -142,21 +182,23 @@ class YOLOProcessor:
         if self.thread:
             self.thread.join(timeout=2.0)
 
-        # Clear caches
-        self.frame_queues.clear()
+        # Clear all buffers
+        self.frame_buffer.clear()
         self.result_cache.clear()
+        self.batch_queue.clear()
+        self.batch_metadata.clear()
 
 
 # Global YOLO processor instance
 _yolo_processor = None
 
 
-def get_yolo_processor(model=None, confidence: float = 0.25) -> Optional[YOLOProcessor]:
+def get_yolo_processor(model=None, confidence: float = 0.25, batch_size: int = 4) -> Optional[YOLOProcessor]:
     """Get global YOLO processor instance."""
     global _yolo_processor
 
     if _yolo_processor is None and model is not None:
-        _yolo_processor = YOLOProcessor(model, confidence)
+        _yolo_processor = YOLOProcessor(model, confidence, batch_size)
         if _yolo_processor.start():
             return _yolo_processor
         else:
