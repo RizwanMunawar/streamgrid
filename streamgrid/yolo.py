@@ -45,16 +45,16 @@ class YOLOProcessor:
         while self.running:
             try:
                 # Collect frames for batch processing
-                self._collect_batch()
+                self.collect_batch()
 
                 # Process batch if we have enough frames
                 if len(self.batch_queue) >= self.batch_size:
-                    self._process_batch()
+                    self.process_batch()
                 elif len(self.batch_queue) > 0:
                     # Process remaining frames after a timeout
                     time.sleep(0.05)  # 50ms timeout
                     if len(self.batch_queue) > 0:  # Still have frames
-                        self._process_batch()
+                        self.process_batch()
                 else:
                     time.sleep(0.01)  # Wait for frames
 
@@ -63,7 +63,7 @@ class YOLOProcessor:
                     print(f"YOLO batch processing error: {e}")
                 time.sleep(0.1)
 
-    def _collect_batch(self):
+    def collect_batch(self):
         """Collect frames from buffer into batch queue."""
         # Get latest frame from each stream that has new data
         for stream_id, frame_data in list(self.frame_buffer.items()):
@@ -79,7 +79,7 @@ class YOLOProcessor:
                     # Clear from buffer to avoid reprocessing
                     self.frame_buffer[stream_id] = None
 
-    def _process_batch(self):
+    def process_batch(self):
         """Process collected batch of frames."""
         if not self.batch_queue:
             return
@@ -108,7 +108,7 @@ class YOLOProcessor:
                 if i >= len(results):
                     break
 
-                annotated_frame = self._draw_detections(batch_frames[i], result)
+                annotated_frame = self.draw_detections(batch_frames[i], result)
 
                 self.result_cache[meta['stream_id']] = {
                     'frame': annotated_frame,
@@ -131,7 +131,7 @@ class YOLOProcessor:
             self.batch_queue.clear()
             self.batch_metadata.clear()
 
-    def _draw_detections(self, frame: np.ndarray, result) -> np.ndarray:
+    def draw_detections(self, frame: np.ndarray, result) -> np.ndarray:
         """Draw YOLO detections on frame."""
         annotated = frame.copy()
 

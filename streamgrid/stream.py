@@ -12,12 +12,7 @@ import numpy as np
 class VideoStream:
     """Single video stream with optional YOLO."""
 
-    def __init__(self,
-                 source: Union[str, int],
-                 fps: int,
-                 cell_size: Tuple[int, int],
-                 stream_id: int = 0,
-                 yolo_processor=None):
+    def __init__(self, source, fps, cell_size, stream_id=0, yolo_processor=None):
         self.source = source
         self.fps = fps
         self.cell_size = cell_size

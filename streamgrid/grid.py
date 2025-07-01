@@ -14,20 +14,8 @@ from .yolo import stop_yolo
 class StreamGrid:
     """Ultra-fast multi-stream video display with optional YOLO."""
 
-    def __init__(self,
-                 sources: List[Union[str, int]],
-                 fps: int = 10,
-                 model=None,
-                 confidence: float = 0.25,
-                 batch: int = 4):
-        """Initialize StreamGrid.
-
-        Args:
-            sources: List of video sources
-            fps: Target FPS
-            model: YOLO model instance (optional)
-            confidence: YOLO confidence threshold
-        """
+    def __init__(self, sources, fps= 10, model=None, confidence=0.25, batch=4):
+        """Initialize StreamGrid."""
         self.sources = sources
         self.num_streams = len(sources)
         self.fps = fps / self.num_streams
