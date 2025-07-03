@@ -1,269 +1,168 @@
-"""
-Ultra-optimized StreamGrid class with 50% less code and same functionality.
-"""
-
 import math
 import time
-from typing import List, Union, Optional, Tuple
+import threading
 import cv2
 import numpy as np
 
-from .stream import VideoStream
-from .utils import get_yolo_processor, cleanup_yolo, draw_text_bg, draw_stats_panel
-
 
 class StreamGrid:
-    """
-    Ultra-fast multi-stream video display with YOLO detection.
-    Optimized from 200+ lines to ~100 lines while maintaining all features.
-    """
+    """Ultra-optimized StreamGrid for external frame/result input."""
 
-    def __init__(
-        self,
-        sources: List[Union[str, int]],
-        fps: int = 10,
-        model=None,
-        confidence: float = 0.25,
-        batch_size: int = 4
-    ):
-        """
-        Initialize StreamGrid with automatic optimization.
+    def __init__(self, max_sources=4):
+        self.max_sources = max_sources
+        self.cols = int(math.ceil(math.sqrt(max_sources)))
+        self.rows = int(math.ceil(max_sources / self.cols))
 
-        Args:
-            sources: List of video sources
-            fps: Target display FPS
-            model: Optional YOLO model
-            confidence: YOLO confidence threshold
-            batch_size: YOLO batch size
-        """
-        self.sources = sources
-        self.num_streams = len(sources)
-        self.fps = fps
-        self.model = model
+        # Auto cell size based on source count
+        sizes = {1: (1280, 720), 4: (640, 360), 9: (480, 270), 16: (320, 180)}
+        self.cell_w, self.cell_h = next((s for n, s in sizes.items() if max_sources <= n), (240, 135))
 
-        # Auto-calculate optimal layout and sizes
-        self.grid_rows, self.grid_cols = self._calc_grid_layout()
-        self.cell_size = self._calc_cell_size()
-        self.stream_fps = fps / max(1, self.num_streams)
-
-        # Initialize YOLO processor
-        self.yolo_processor = get_yolo_processor(model, confidence, batch_size) if model else None
-
-        # Initialize display
-        self.streams = []
-        self.grid_image = np.zeros((
-            self.grid_rows * self.cell_size[1],
-            self.grid_cols * self.cell_size[0],
-            3
-        ), dtype=np.uint8)
-
-        # State
-        self.running = False
+        self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
+        self.frames = {}
+        self.stats = {}
         self.show_stats = True
-        self.frame_count = 0
-        self.start_time = None
+        self.running = False
+        self.lock = threading.Lock()
 
-        # Print setup info
-        yolo_info = f" + YOLO(batch={batch_size})" if model else ""
-        print(f"StreamGrid: {self.num_streams} streams @ {self.stream_fps:.1f}fps, {self.cell_size}{yolo_info}")
+        # Pre-generate colors for classes
+        self.colors = {}
+        self.color_idx = 0
 
-    def _calc_grid_layout(self) -> Tuple[int, int]:
-        """Calculate optimal grid layout."""
-        cols = int(math.ceil(math.sqrt(self.num_streams)))
-        rows = int(math.ceil(self.num_streams / cols))
-        return rows, cols
+    def _get_color(self, class_name):
+        """Get consistent color for class."""
+        if class_name not in self.colors:
+            hue = int((self.color_idx * 137.5) % 180)  # OpenCV hue is 0-179
+            rgb = cv2.cvtColor(np.uint8([[[hue, 200, 200]]]), cv2.COLOR_HSV2BGR)[0][0]
+            self.colors[class_name] = tuple(map(int, rgb))
+            self.color_idx += 1
+        return self.colors[class_name]
 
-    def _calc_cell_size(self) -> Tuple[int, int]:
-        """Calculate optimal cell size based on stream count."""
-        size_map = {
-            1: (1280, 720),
-            4: (640, 360),
-            9: (480, 270),
-            16: (320, 180),
-            float('inf'): (240, 135)
-        }
+    def update_source(self, source_id, frame, yolo_results=None):
+        """Update frame and results for a source."""
+        if source_id >= self.max_sources:
+            return
 
-        for max_streams, size in size_map.items():
-            if self.num_streams <= max_streams:
-                return size
+        with self.lock:
+            # Resize frame
+            resized = cv2.resize(frame, (self.cell_w, self.cell_h))
 
-        return (240, 135)  # Fallback
+            # Draw detections
+            detections = 0
+            if yolo_results and yolo_results.boxes is not None:
+                detections = len(yolo_results.boxes)
+                resized = self._draw_boxes(resized, yolo_results, frame.shape[:2])
 
-    def run(self) -> int:
-        """Run StreamGrid with error handling."""
-        try:
-            return self._main_loop()
-        except KeyboardInterrupt:
-            print("\nExiting...")
-            return 0
-        except Exception as e:
-            print(f"Error: {e}")
-            return 1
-        finally:
-            self.stop()
+            self.frames[source_id] = resized
+            self.stats[source_id] = {'detections': detections, 'time': time.time()}
 
-    def _main_loop(self) -> int:
-        """Main execution loop."""
+    def _draw_boxes(self, frame, results, orig_shape):
+        """Draw YOLO detections with proper scaling."""
+        if not results.boxes:
+            return frame
+
+        # Scale factors
+        scale_x = self.cell_w / orig_shape[1]
+        scale_y = self.cell_h / orig_shape[0]
+
+        boxes = results.boxes.xyxy.cpu().numpy()
+        confs = results.boxes.conf.cpu().numpy()
+        classes = results.boxes.cls.cpu().numpy()
+
+        for box, conf, cls in zip(boxes, confs, classes):
+            # Scale coordinates
+            x1, y1, x2, y2 = (box * [scale_x, scale_y, scale_x, scale_y]).astype(int)
+
+            # Draw box
+            class_name = results.names[int(cls)]
+            color = self._get_color(class_name)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            # Draw label
+            label = f"{class_name}: {conf:.2f}"
+            (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+            y_text = max(y1 - 5, 15)
+
+            cv2.rectangle(frame, (x1, y_text - h - 3), (x1 + w + 4, y_text + 3), color, -1)
+            text_color = (0, 0, 0) if sum(color) > 400 else (255, 255, 255)
+            cv2.putText(frame, label, (x1 + 2, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+
+        return frame
+
+    def run(self):
+        """Run display loop."""
         self.running = True
-        self.start_time = time.time()
-
-        # Start all streams
-        if not self._start_streams():
-            return 1
-
-        # Setup display
         cv2.namedWindow("StreamGrid", cv2.WINDOW_AUTOSIZE)
-        print("Controls: ESC=exit, s=toggle stats, r=reset")
+        print("StreamGrid running. Press ESC to exit, 's' to toggle stats")
 
-        # Main loop
         while self.running:
-            loop_start = time.time()
-
-            # Update display
             self._update_display()
 
-            # Handle input
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC
                 break
             elif key == ord('s'):
                 self.show_stats = not self.show_stats
-            elif key == ord('r'):
-                self.frame_count = 0
-                self.start_time = time.time()
 
-            # Check if streams finished
-            if not any(s.is_active() for s in self.streams):
-                print("All streams finished")
-                break
-
-            # Control frame rate
-            elapsed = time.time() - loop_start
-            target_time = 1.0 / self.fps
-            if elapsed < target_time:
-                time.sleep(target_time - elapsed)
-
-        return 0
-
-    def _start_streams(self) -> bool:
-        """Start all video streams."""
-        success_count = 0
-
-        for i, source in enumerate(self.sources):
-            stream = VideoStream(source, self.stream_fps, self.cell_size, i, self.yolo_processor)
-
-            if stream.start():
-                self.streams.append(stream)
-                success_count += 1
-                print(f"✓ Stream {i}: {stream.get_info()}")
-            else:
-                print(f"✗ Stream {i}: Failed to start")
-
-        print(f"Started {success_count}/{self.num_streams} streams")
-        return success_count > 0
-
-    def _update_display(self):
-        """Update grid display with optimized rendering."""
-        h, w = self.cell_size[1], self.cell_size[0]
-
-        # Clear grid
-        self.grid_image.fill(0)
-
-        # Update each cell
-        for i, stream in enumerate(self.streams):
-            if i >= self.grid_rows * self.grid_cols:
-                break
-
-            # Calculate position
-            row, col = i // self.grid_cols, i % self.grid_cols
-            y1, y2 = row * h, (row + 1) * h
-            x1, x2 = col * w, (col + 1) * w
-
-            # Get frame
-            frame = stream.get_frame()
-            if frame is None:
-                frame = self._create_no_signal_frame(w, h, i)
-
-            # Ensure correct size
-            if frame.shape[:2] != (h, w):
-                frame = cv2.resize(frame, (w, h))
-
-            # Add stream info
-            if self.show_stats:
-                info = f"#{i}"
-                fps = stream.get_fps()
-                if fps > 0:
-                    info += f" {fps:.1f}fps"
-
-                if self.model:
-                    detections = stream.get_detection_count()
-                    if detections > 0:
-                        info += f" {detections}obj"
-
-                draw_text_bg(frame, info, (5, 15), 0.4, (255, 255, 255), (0, 0, 0))
-
-            # Place in grid
-            self.grid_image[y1:y2, x1:x2] = frame
-
-        # Add global stats
-        if self.show_stats:
-            self._draw_global_stats()
-
-        # Display
-        cv2.imshow("StreamGrid", self.grid_image)
-        self.frame_count += 1
-
-    def _create_no_signal_frame(self, w: int, h: int, stream_id: int) -> np.ndarray:
-        """Create no signal frame."""
-        frame = np.zeros((h, w, 3), dtype=np.uint8)
-
-        # Checkerboard pattern
-        for y in range(0, h, 20):
-            for x in range(0, w, 20):
-                if (x // 20 + y // 20) % 2:
-                    frame[y:y+20, x:x+20] = 20
-
-        # Text
-        cv2.putText(frame, "NO SIGNAL", (w//4, h//2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
-        cv2.putText(frame, f"Stream #{stream_id}", (w//4, h//2 + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1)
-
-        return frame
-
-    def _draw_global_stats(self):
-        """Draw global statistics panel."""
-        # Calculate stats
-        active_streams = [s for s in self.streams if s.is_active()]
-        avg_fps = sum(s.get_fps() for s in active_streams) / len(active_streams) if active_streams else 0
-
-        # Create stats
-        stats = [
-            f"Avg FPS: {avg_fps:.1f}",
-            f"Active: {len(active_streams)}/{self.num_streams}",
-            f"Frame: {self.frame_count}"
-        ]
-
-        # Add YOLO stats
-        if self.yolo_processor:
-            yolo_stats = self.yolo_processor.get_stats()
-            stats.append(f"YOLO: {yolo_stats.get('fps', 0):.1f}fps")
-            stats.append(f"Objects: {yolo_stats.get('detections', 0)}")
-
-        # Draw panel
-        draw_stats_panel(self.grid_image, stats)
-
-    def stop(self):
-        """Stop all streams and cleanup."""
-        self.running = False
-
-        # Stop streams
-        for stream in self.streams:
-            stream.stop()
-
-        # Cleanup YOLO
-        if self.yolo_processor:
-            cleanup_yolo()
-
-        # Close display
         cv2.destroyAllWindows()
 
-        print("StreamGrid stopped")
+    def _update_display(self):
+        """Update grid display."""
+        self.grid.fill(0)
+
+        with self.lock:
+            for i in range(self.max_sources):
+                row, col = divmod(i, self.cols)
+                y1, y2 = row * self.cell_h, (row + 1) * self.cell_h
+                x1, x2 = col * self.cell_w, (col + 1) * self.cell_w
+
+                if i in self.frames:
+                    frame = self.frames[i].copy()
+
+                    # Add stats
+                    if self.show_stats:
+                        info = f"Source #{i}"
+                        if i in self.stats and self.stats[i]['detections'] > 0:
+                            info += f" - {self.stats[i]['detections']} objects"
+
+                        cv2.rectangle(frame, (2, 2), (len(info) * 6 + 6, 18), (0, 0, 0), -1)
+                        cv2.putText(frame, info, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                else:
+                    # Create placeholder
+                    frame = np.zeros((self.cell_h, self.cell_w, 3), dtype=np.uint8)
+
+                    # Checkerboard pattern
+                    for y in range(0, self.cell_h, 20):
+                        for x in range(0, self.cell_w, 20):
+                            if (x // 20 + y // 20) % 2:
+                                frame[y:y + 20, x:x + 20] = 20
+
+                    cv2.putText(frame, "WAITING", (self.cell_w // 4, self.cell_h // 2),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
+                    cv2.putText(frame, f"Source #{i}", (self.cell_w // 4, self.cell_h // 2 + 25),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1)
+
+                self.grid[y1:y2, x1:x2] = frame
+
+        # # Global stats
+        # if self.show_stats:
+        #     active = len(self.frames)
+        #     total_detections = sum(s.get('detections', 0) for s in self.stats.values())
+        #
+        #     stats_text = [
+        #         f"Active: {active}/{self.max_sources}",
+        #         f"Objects: {total_detections}"
+        #     ]
+        #
+        #     # Draw stats panel
+        #     max_w = max(len(s) * 6 for s in stats_text)
+        #     cv2.rectangle(self.grid, (10, 10), (20 + max_w, 50), (0, 0, 0), -1)
+        #
+        #     for i, stat in enumerate(stats_text):
+        #         cv2.putText(self.grid, stat, (15, 28 + i * 15),
+        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+
+        cv2.imshow("StreamGrid", self.grid)
+
+    def stop(self):
+        """Stop display."""
+        self.running = False
