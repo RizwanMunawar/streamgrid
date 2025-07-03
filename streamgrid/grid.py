@@ -1,21 +1,23 @@
 import math
 import time
 import threading
+import queue
 import cv2
 import numpy as np
 
 
 class StreamGrid:
-    """StreamGrid for external frame/result input."""
+    """StreamGrid for multi-stream video display with batch processing."""
 
-    def __init__(self, max_sources=4):
-        self.max_sources = max_sources
-        self.cols = int(math.ceil(math.sqrt(max_sources)))
-        self.rows = int(math.ceil(max_sources / self.cols))
+    def __init__(self, sources, model=None, batch_size=4):
+        self.sources = sources
+        self.max_sources = len(sources)
+        self.cols = int(math.ceil(math.sqrt(self.max_sources)))
+        self.rows = int(math.ceil(self.max_sources / self.cols))
 
         # Auto cell size based on source count
         sizes = {1: (1280, 720), 4: (640, 360), 9: (480, 270), 16: (320, 180)}
-        self.cell_w, self.cell_h = next((s for n, s in sizes.items() if max_sources <= n), (240, 135))
+        self.cell_w, self.cell_h = next((s for n, s in sizes.items() if self.max_sources <= n), (240, 135))
 
         self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
         self.frames = {}
@@ -28,14 +30,85 @@ class StreamGrid:
         self.colors = {}
         self.color_idx = 0
 
+        # Batch processing
+        self.model = model
+        self.batch_size = batch_size
+        self.frame_queue = queue.Queue(maxsize=50)
+
     def get_color(self, class_name):
         """Get consistent color for class."""
         if class_name not in self.colors:
-            hue = int((self.color_idx * 137.5) % 180)  # OpenCV hue is 0-179
+            hue = int((self.color_idx * 137.5) % 180)
             rgb = cv2.cvtColor(np.uint8([[[hue, 200, 200]]]), cv2.COLOR_HSV2BGR)[0][0]
             self.colors[class_name] = tuple(map(int, rgb))
             self.color_idx += 1
         return self.colors[class_name]
+
+    def _capture_video(self, source, source_id):
+        """Capture video frames with CPU optimizations."""
+        cap = cv2.VideoCapture(source)
+
+        # Reduce capture resolution for CPU
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
+
+        frame_skip = 0  # Skip frames for CPU (process every 2nd frame)
+        frame_count = 0
+
+        while self.running and cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                continue
+
+            # Skip frames for CPU performance
+            frame_count += 1
+            # if frame_count % frame_skip != 0:
+            #     continue
+
+            try:
+                self.frame_queue.put((source_id, frame), timeout=0.01)
+            except queue.Full:
+                pass
+            time.sleep(0.05)  # Slower for CPU
+        cap.release()
+
+    def _batch_worker(self):
+        """Batch processing worker with CPU optimizations."""
+        batch_frames, batch_ids = [], []
+
+        while self.running:
+            # Collect frames
+            while len(batch_frames) < self.batch_size:
+                try:
+                    source_id, frame = self.frame_queue.get(timeout=0.01)
+                    batch_frames.append(frame)
+                    batch_ids.append(source_id)
+                except queue.Empty:
+                    break
+
+            if batch_frames:
+                try:
+                    if self.model:
+                        results = self.model.predict(
+                            batch_frames,
+                            conf=0.25,
+                            verbose=False,
+                            device='cpu',  # Force CPU
+                            half=False,  # No half precision on CPU
+                        )
+
+                        for source_id, frame, result in zip(batch_ids, batch_frames, results):
+                            self.update_source(source_id, frame, result)
+                    else:
+                        for source_id, frame in zip(batch_ids, batch_frames):
+                            self.update_source(source_id, frame)
+                except Exception as e:
+                    print(f"Batch error: {e}")
+
+                batch_frames.clear()
+                batch_ids.clear()
 
     def update_source(self, source_id, frame, yolo_results=None):
         """Update frame and results for a source."""
@@ -61,7 +134,7 @@ class StreamGrid:
             return frame
 
         # Scale factors
-        scale_x = self.cell_w / orig_shape[1]
+        scale_x = self.cell_w / orig_shape[1]  # orig_shape from YOLO input
         scale_y = self.cell_h / orig_shape[0]
 
         boxes = results.boxes.xyxy.cpu().numpy()
@@ -91,6 +164,14 @@ class StreamGrid:
     def run(self):
         """Run display loop."""
         self.running = True
+
+        # Start capture threads
+        for i, source in enumerate(self.sources):
+            threading.Thread(target=self._capture_video, args=(source, i), daemon=True).start()
+
+        # Start batch processing
+        threading.Thread(target=self._batch_worker, daemon=True).start()
+
         cv2.namedWindow("StreamGrid", cv2.WINDOW_AUTOSIZE)
         print("StreamGrid running. Press ESC to exit, 's' to toggle stats")
 
@@ -142,24 +223,6 @@ class StreamGrid:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1)
 
                 self.grid[y1:y2, x1:x2] = frame
-
-        # # Global stats
-        # if self.show_stats:
-        #     active = len(self.frames)
-        #     total_detections = sum(s.get('detections', 0) for s in self.stats.values())
-        #
-        #     stats_text = [
-        #         f"Active: {active}/{self.max_sources}",
-        #         f"Objects: {total_detections}"
-        #     ]
-        #
-        #     # Draw stats panel
-        #     max_w = max(len(s) * 6 for s in stats_text)
-        #     cv2.rectangle(self.grid, (10, 10), (20 + max_w, 50), (0, 0, 0), -1)
-        #
-        #     for i, stat in enumerate(stats_text):
-        #         cv2.putText(self.grid, stat, (15, 28 + i * 15),
-        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
         cv2.imshow("StreamGrid", self.grid)
 
