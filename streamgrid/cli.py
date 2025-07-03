@@ -1,6 +1,3 @@
-# cli.py
-"""Simplified CLI interface."""
-
 import argparse
 import sys
 from pathlib import Path
@@ -21,8 +18,7 @@ def main():
     sources = []
     for src in args.sources:
         try:
-            # Try camera index
-            cam_id = int(src)
+            cam_id = int(src)  # Try camera index
             if 0 <= cam_id <= 10:
                 sources.append(cam_id)
                 continue
@@ -51,15 +47,10 @@ def main():
     # Create and run StreamGrid
     try:
         grid = StreamGrid(max_sources=len(sources))
-
-        # Here you would add your video processing threads
-        # (as shown in your example code)
-
         return grid.run()
     except Exception as e:
         print(f"Error: {e}")
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())

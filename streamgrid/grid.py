@@ -6,7 +6,7 @@ import numpy as np
 
 
 class StreamGrid:
-    """Ultra-optimized StreamGrid for external frame/result input."""
+    """StreamGrid for external frame/result input."""
 
     def __init__(self, max_sources=4):
         self.max_sources = max_sources
@@ -28,7 +28,7 @@ class StreamGrid:
         self.colors = {}
         self.color_idx = 0
 
-    def _get_color(self, class_name):
+    def get_color(self, class_name):
         """Get consistent color for class."""
         if class_name not in self.colors:
             hue = int((self.color_idx * 137.5) % 180)  # OpenCV hue is 0-179
@@ -74,7 +74,7 @@ class StreamGrid:
 
             # Draw box
             class_name = results.names[int(cls)]
-            color = self._get_color(class_name)
+            color = self.get_color(class_name)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
             # Draw label
