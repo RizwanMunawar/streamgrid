@@ -1,6 +1,7 @@
-"""StreamGrid - Ultra-fast multi-stream video display with YOLO detection."""
+"""StreamGrid - Ultra-fast multi-stream video display."""
 
-__version__ = "2.0.0"
-__all__ = ["StreamGrid"]
+__version__ = "1.0.0"
 
 from .grid import StreamGrid
+
+__all__ = ["StreamGrid"]
