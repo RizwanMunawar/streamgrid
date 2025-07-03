@@ -1,4 +1,4 @@
-"""StreamGrid - Ultra-fast multi-stream video display."""
+"""StreamGrid - Ultra-fast multi-stream video display"""
 
 __version__ = "1.0.0"
 
