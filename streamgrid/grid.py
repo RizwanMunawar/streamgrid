@@ -43,7 +43,7 @@ class StreamGrid:
     def get_color(self, class_idx):
         return self.colors[class_idx % len(self.colors)]
 
-    def _capture_video(self, source, source_id):
+    def capture_video(self, source, source_id):
         """Capture video frames with CPU optimizations."""
         cap = cv2.VideoCapture(source)
 
@@ -117,12 +117,12 @@ class StreamGrid:
             detections = 0
             if yolo_results and yolo_results.boxes is not None:
                 detections = len(yolo_results.boxes)
-                resized = self._draw_boxes(resized, yolo_results, frame.shape[:2])
+                resized = self.draw_boxes(resized, yolo_results, frame.shape[:2])
 
             self.frames[source_id] = resized
             self.stats[source_id] = {'detections': detections, 'time': time.time()}
 
-    def _draw_boxes(self, frame, results, orig_shape):
+    def draw_boxes(self, frame, results, orig_shape):
         """Draw YOLO detections with proper scaling."""
         if not results.boxes:
             return frame
@@ -161,7 +161,7 @@ class StreamGrid:
 
         # Start capture threads
         for i, source in enumerate(self.sources):
-            threading.Thread(target=self._capture_video, args=(source, i), daemon=True).start()
+            threading.Thread(target=self.capture_video, args=(source, i), daemon=True).start()
 
         # Start batch processing
         threading.Thread(target=self._batch_worker, daemon=True).start()
