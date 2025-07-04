@@ -43,15 +43,6 @@ class StreamGrid:
     def get_color(self, class_idx):
         return self.colors[class_idx % len(self.colors)]
 
-    # def get_color(self, class_name):
-    #     """Get consistent color for class."""
-    #     if class_name not in self.colors:
-    #         hue = int((self.color_idx * 137.5) % 180)
-    #         rgb = cv2.cvtColor(np.uint8([[[hue, 200, 200]]]), cv2.COLOR_HSV2BGR)[0][0]
-    #         self.colors[class_name] = tuple(map(int, rgb))
-    #         self.color_idx += 1
-    #     return self.colors[class_name]
-
     def _capture_video(self, source, source_id):
         """Capture video frames with CPU optimizations."""
         cap = cv2.VideoCapture(source)
