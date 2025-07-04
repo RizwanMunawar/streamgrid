@@ -35,14 +35,22 @@ class StreamGrid:
         self.batch_size = batch_size
         self.frame_queue = queue.Queue(maxsize=50)
 
-    def get_color(self, class_name):
-        """Get consistent color for class."""
-        if class_name not in self.colors:
-            hue = int((self.color_idx * 137.5) % 180)
-            rgb = cv2.cvtColor(np.uint8([[[hue, 200, 200]]]), cv2.COLOR_HSV2BGR)[0][0]
-            self.colors[class_name] = tuple(map(int, rgb))
-            self.color_idx += 1
-        return self.colors[class_name]
+        # Colors
+        self.colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
+                       (255, 255, 0), (255, 0, 255), (0, 255, 255),
+                       (255, 128, 0), (128, 0, 255)]
+
+    def get_color(self, class_idx):
+        return self.colors[class_idx % len(self.colors)]
+
+    # def get_color(self, class_name):
+    #     """Get consistent color for class."""
+    #     if class_name not in self.colors:
+    #         hue = int((self.color_idx * 137.5) % 180)
+    #         rgb = cv2.cvtColor(np.uint8([[[hue, 200, 200]]]), cv2.COLOR_HSV2BGR)[0][0]
+    #         self.colors[class_name] = tuple(map(int, rgb))
+    #         self.color_idx += 1
+    #     return self.colors[class_name]
 
     def _capture_video(self, source, source_id):
         """Capture video frames with CPU optimizations."""
@@ -53,7 +61,6 @@ class StreamGrid:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
 
-        frame_skip = 0  # Skip frames for CPU (process every 2nd frame)
         frame_count = 0
 
         while self.running and cap.isOpened():
@@ -62,11 +69,7 @@ class StreamGrid:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
 
-            # Skip frames for CPU performance
             frame_count += 1
-            # if frame_count % frame_skip != 0:
-            #     continue
-
             try:
                 self.frame_queue.put((source_id, frame), timeout=0.01)
             except queue.Full:
@@ -147,7 +150,7 @@ class StreamGrid:
 
             # Draw box
             class_name = results.names[int(cls)]
-            color = self.get_color(class_name)
+            color = self.get_color(int(cls))
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
             # Draw label
@@ -198,15 +201,6 @@ class StreamGrid:
 
                 if i in self.frames:
                     frame = self.frames[i].copy()
-
-                    # Add stats
-                    if self.show_stats:
-                        info = f"Source #{i}"
-                        if i in self.stats and self.stats[i]['detections'] > 0:
-                            info += f" - {self.stats[i]['detections']} objects"
-
-                        cv2.rectangle(frame, (2, 2), (len(info) * 6 + 6, 18), (0, 0, 0), -1)
-                        cv2.putText(frame, info, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                 else:
                     # Create placeholder
                     frame = np.zeros((self.cell_h, self.cell_w, 3), dtype=np.uint8)
@@ -217,10 +211,19 @@ class StreamGrid:
                             if (x // 20 + y // 20) % 2:
                                 frame[y:y + 20, x:x + 20] = 20
 
-                    cv2.putText(frame, "WAITING", (self.cell_w // 4, self.cell_h // 2),
+                    # Center "WAITING" text
+                    text = "WAITING"
+                    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    cv2.putText(frame, text, ((self.cell_w - w) // 2, (self.cell_h - h) // 2 + h),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
-                    cv2.putText(frame, f"Source #{i}", (self.cell_w // 4, self.cell_h // 2 + 25),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 100), 1)
+
+                info = f"Source #{i}"
+                (text_width, text_height), baseline = cv2.getTextSize(info, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+
+                cv2.rectangle(frame, (2, 2), (2 + text_width + 8, 2 + text_height + baseline + 8), (0, 0, 0),
+                              -1)
+                cv2.putText(frame, info, (6, 6 + text_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255),
+                            1)
 
                 self.grid[y1:y2, x1:x2] = frame
 

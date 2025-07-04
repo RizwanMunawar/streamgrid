@@ -1,6 +1,7 @@
 # StreamGrid ⚡
 
-**Ultra-fast multi-stream video display** - Display multiple video sources simultaneously with minimal CPU usage.
+**Ultra-fast multi-stream video display** - Display multiple video sources with object detection simultaneously using the CPU 
+or GPU device.
 
 ## Installation
 
@@ -10,20 +11,7 @@ pip install streamgrid
 
 ## Quick Start
 
-### Command Line
-
-```bash
-# Display multiple video files
-streamgrid video1.mp4 video2.mp4 video3.mp4
-
-# Mix cameras and videos
-streamgrid 0 1 video.mp4
-
-# RTSP streams
-streamgrid rtsp://192.168.1.100/stream rtsp://192.168.1.101/stream
-```
-
-### Python API
+### Python
 
 ```python
 from ultralytics import YOLO
