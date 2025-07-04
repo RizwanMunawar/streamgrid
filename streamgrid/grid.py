@@ -170,7 +170,7 @@ class StreamGrid:
         print("StreamGrid running. Press ESC to exit, 's' to toggle stats")
 
         while self.running:
-            self._update_display()
+            self.update_display()
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC
@@ -180,7 +180,7 @@ class StreamGrid:
 
         cv2.destroyAllWindows()
 
-    def _update_display(self):
+    def update_display(self):
         """Update grid display."""
         self.grid.fill(0)
 
