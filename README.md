@@ -26,11 +26,15 @@ streamgrid rtsp://192.168.1.100/stream rtsp://192.168.1.101/stream
 ### Python API
 
 ```python
+from ultralytics import YOLO
 from streamgrid import StreamGrid
 
-# Simple usage
-grid = StreamGrid(['video1.mp4', 'video2.mp4', 0])
-grid.run()
+# Video paths
+paths = ["Video1.mp4", "Video2.mp4", "Video3.mp4", "Video4.mp4"]
+
+model = YOLO("yolo11n.pt")
+StreamGrid(paths, model).run()
+
 ```
 
 ## Performance
