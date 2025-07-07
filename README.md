@@ -1,5 +1,8 @@
 # StreamGrid ⚡
 
+[![Publish to PyPI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml)
+
+
 **Ultra-fast multi-stream video display** - Display multiple video sources with object detection simultaneously using the CPU 
 or GPU device.
 
