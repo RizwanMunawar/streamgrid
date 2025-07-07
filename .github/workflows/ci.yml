@@ -34,4 +34,4 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest test_streamgrid.py
+        pytest tests/core.py
