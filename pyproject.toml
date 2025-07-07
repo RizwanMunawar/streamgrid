@@ -1,3 +1,8 @@
+# StreamGrid - Ultra-fast multi-stream video display
+# A Python package for displaying multiple video streams in a grid layout
+# with real-time performance in computer vision projects and minimal resource usage.
+# Built with OpenCV for high-performance video processing.
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -10,13 +15,11 @@ authors = [
     {name = "Muhammad Rizwan Munawar"}
 ]
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.8"
-keywords = ["video", "streaming", "display", "multi-stream", "opencv", "real-time", "python"]
+keywords = ["video", "streaming", "display", "multi-stream", "opencv", "real-time", "python", "ultralytics"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -31,14 +34,6 @@ classifiers = [
 dependencies = [
     "opencv-python>=4.5.0",
     "numpy>=1.21.0",
-    "psutil>=5.8.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=6.0",
-    "black>=22.0",
-    "ruff>=0.1.0",
 ]
 
 [project.urls]
@@ -47,17 +42,12 @@ Repository = "https://github.com/RizwanMunawar/streamgrid"
 Issues = "https://github.com/RizwanMunawar/streamgrid/issues"
 Documentation = "https://github.com/RizwanMunawar/streamgrid#readme"
 
-[project.scripts]
-streamgrid = "streamgrid.cli:main"
-
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["streamgrid*"]
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
 
 [tool.ruff]
 line-length = 88
-target-version = "py38"
