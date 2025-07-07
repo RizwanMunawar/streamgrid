@@ -11,7 +11,7 @@ class StreamGrid:
 
     def __init__(self, sources, model=None, batch_size=4):
         self.sources = sources
-        self.max_sources = len(sources)
+        self.max_sources = self.batch_size = len(sources)
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
         self.rows = int(math.ceil(self.max_sources / self.cols))
 
@@ -32,7 +32,6 @@ class StreamGrid:
 
         # Batch processing
         self.model = model
-        self.batch_size = batch_size
         self.frame_queue = queue.Queue(maxsize=50)
 
         # Colors
