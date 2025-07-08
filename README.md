@@ -1,5 +1,7 @@
 # StreamGrid ⚡
 
+https://github.com/user-attachments/assets/67bbb880-c412-4d99-af35-9a3bc1163c5e
+
 [![Publish to PyPI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml)
 
 
