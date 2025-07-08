@@ -5,6 +5,8 @@ import queue
 import cv2
 import numpy as np
 from collections import deque
+from pathlib import Path
+import requests
 from ultralytics.utils.plotting import Annotator, colors
 
 
@@ -35,7 +37,7 @@ class StreamGrid:
         video_writer: OpenCV video writer object.
     """
 
-    def __init__(self, sources, model=None, save=True):
+    def __init__(self, sources=None, model=None, save=True):
         """Initialize StreamGrid with video sources and configuration.
 
         Args:
@@ -48,8 +50,19 @@ class StreamGrid:
             save (bool, optional): Whether to save output video. Defaults to True.
                 Output will be saved as "streamgrid_output_{N}_streams.mp4".
         """
-        if not sources:
-            raise ValueError("Sources list cannot be empty")
+        # GitHub repository URLs for default videos
+        self.GITHUB_ASSETS_BASE = "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
+        self.DEFAULT_VIDEOS = [
+            "grid_1.mp4",
+            "grid_2.mp4",
+            "grid_3.mp4",
+            "grid_4.mp4"
+        ]
+        print(sources)
+        # Handle default sources
+        if sources is None:
+            print("No sources provided. Downloading default demo videos...")
+            sources = self.get_default_videos()
 
         self.sources = sources
         self.max_sources = self.batch_size = len(sources)
@@ -98,6 +111,52 @@ class StreamGrid:
             )
 
         self.run()
+
+    def get_default_videos(self):
+        """Download and return paths to default demo videos.
+
+        Downloads demo videos from GitHub releases if they don't exist locally.
+        Creates a 'demo_videos' directory to store downloaded files.
+
+        Returns:
+            list: List of local file paths to demo videos.
+
+        Raises:
+            RuntimeError: If unable to download demo videos.
+        """
+        demo_dir = Path("demo_videos")
+        demo_dir.mkdir(exist_ok=True)
+
+        local_paths = []
+
+        for video_name in self.DEFAULT_VIDEOS:
+            local_path = demo_dir / video_name
+
+            if not local_path.exists():
+                print(f"Downloading {video_name}...")
+                try:
+                    url = f"{self.GITHUB_ASSETS_BASE}{video_name}"
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status()
+
+                    with open(local_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+                    print(f"✓ Downloaded {video_name}")
+
+                except Exception as e:
+                    print(f"✗ Failed to download {video_name}: {e}")
+                    continue
+            else:
+                print(f"✓ Found existing {video_name}")
+
+            local_paths.append(str(local_path))
+
+        if not local_paths:
+            raise RuntimeError("Unable to download or find any demo videos")
+
+        return local_paths
 
     def get_color(self, class_idx):
         """Get color for a given class index.

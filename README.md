@@ -20,22 +20,26 @@ pip install streamgrid
 from ultralytics import YOLO
 from streamgrid import StreamGrid
 
-paths = ["Video1.mp4", "Video2.mp4"]  # Video paths
-model = YOLO("yolo11n.pt")  # Ultralytics Model
+model = YOLO("yolo11n.pt")
+StreamGrid(model=model)  # Use assets videos for testing
 
-StreamGrid(paths, model)
+# Use your own videos
+sources = ["video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4"]
+StreamGrid(source=sources, model=model)
 
 ```
 
-## Performance
+## Performance (Beta, final benchmarks will be released soon)
 
-StreamGrid automatically optimizes performance:
+StreamGrid automatically optimizes performance based on the number of streams:
 
-- **1-2 streams**: 640x360 cells, up to 15 FPS each
-- **3-4 streams**: 480x270 cells, up to 7 FPS each  
-- **5-9 streams**: 320x180 cells, up to 5 FPS each
-- **10+ streams**: 240x135 cells, up to 3 FPS each
+- **1-2 streams**: 640×360 resolution, up to 15 FPS per stream
+- **3-4 streams**: 480×270 resolution, up to 10 FPS total (CPU processing)
+- **5-9 streams**: 320×180 resolution, up to 5 FPS per stream
+- **10+ streams**: 240×135 resolution, up to 3 FPS per stream
+
+*Note: Performance benchmarks are based on CPU processing. GPU acceleration can significantly improve throughput.*
 
 ## Contributing
 
-Contributions welcome! Please feel free to submit a Pull Request.
+We welcome contributions! Please feel free to submit a Pull Request or open an issue for discussion.
