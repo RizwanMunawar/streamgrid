@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamgrid"
-version = "1.0.0"
+version = "1.0.2"
 description = "Ultra-fast multi-stream video display"
 authors = [
     {name = "Muhammad Rizwan Munawar"}
