@@ -20,9 +20,7 @@ pip install streamgrid
 from ultralytics import YOLO
 from streamgrid import StreamGrid
 
-# Video paths
-paths = ["Video1.mp4", "Video2.mp4", "Video3.mp4", "Video4.mp4"]
-
+paths = ["Video1.mp4", "Video2.mp4"]  # Video paths
 model = YOLO("yolo11n.pt")  # Ultralytics Model
 
 StreamGrid(paths, model)
