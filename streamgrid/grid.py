@@ -9,7 +9,7 @@ import numpy as np
 class StreamGrid:
     """StreamGrid for multi-stream video display with batch processing."""
 
-    def __init__(self, sources, model=None, batch_size=4):
+    def __init__(self, sources, model=None, save=True):
         self.sources = sources
         self.max_sources = self.batch_size = len(sources)
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
@@ -38,6 +38,16 @@ class StreamGrid:
         self.colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
                        (255, 255, 0), (255, 0, 255), (0, 255, 255),
                        (255, 128, 0), (128, 0, 255)]
+
+        # Video writer support
+        self.save = save
+        if self.save:
+            self.video_writer = None
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            self.video_writer = cv2.VideoWriter(
+                f"streamgrid_output_{self.batch_size}_streams.avi", fourcc, 30,  # TODO: FPS auto adjust
+                (self.cols * self.cell_w, self.rows * self.cell_h)
+            )
 
     def get_color(self, class_idx):
         return self.colors[class_idx % len(self.colors)]
@@ -221,6 +231,9 @@ class StreamGrid:
                 self.grid[y1:y2, x1:x2] = frame
 
         cv2.imshow("StreamGrid", self.grid)
+
+        if self.save:  # Write frame to video if save=True
+            self.video_writer.write(self.grid)
 
     def stop(self):
         """Stop display."""
