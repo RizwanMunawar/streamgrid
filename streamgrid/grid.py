@@ -4,12 +4,53 @@ import threading
 import queue
 import cv2
 import numpy as np
+from collections import deque
+from ultralytics.utils.plotting import Annotator, colors
 
 
 class StreamGrid:
-    """StreamGrid for multi-stream video display with batch processing."""
+    """StreamGrid for multi-stream video display with batch processing.
+
+    A real-time video grid display system that can handle multiple video sources
+    simultaneously with optional YOLO object detection and video recording capabilities.
+    Features adaptive UI scaling, batch processing for efficiency, and comprehensive
+    FPS monitoring.
+
+    Attributes:
+        sources (list): List of video sources (file paths, camera indices, or URLs).
+        max_sources (int): Maximum number of sources to display.
+        batch_size (int): Number of frames to process in each batch.
+        cols (int): Number of columns in the grid layout.
+        rows (int): Number of rows in the grid layout.
+        cell_w (int): Width of each cell in pixels.
+        cell_h (int): Height of each cell in pixels.
+        grid (np.ndarray): The main display grid array.
+        frames (dict): Dictionary storing current frames for each source.
+        stats (dict): Dictionary storing statistics for each source.
+        show_stats (bool): Whether to display statistics overlay.
+        running (bool): Flag controlling the main processing loop.
+        model: YOLO model for object detection (optional).
+        prediction_fps (float): Current prediction frames per second.
+        save (bool): Whether to save output video.
+        video_writer: OpenCV video writer object.
+    """
 
     def __init__(self, sources, model=None, save=True):
+        """Initialize StreamGrid with video sources and configuration.
+
+        Args:
+            sources (list): List of video sources. Can be:
+                - File paths (str): "video.mp4", "stream.avi"
+                - Camera indices (int): 0, 1, 2
+                - Stream URLs (str): "rtsp://camera_url"
+            model (optional): YOLO model instance for object detection.
+                If None, only displays video without detection.
+            save (bool, optional): Whether to save output video. Defaults to True.
+                Output will be saved as "streamgrid_output_{N}_streams.mp4".
+        """
+        if not sources:
+            raise ValueError("Sources list cannot be empty")
+
         self.sources = sources
         self.max_sources = self.batch_size = len(sources)
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
@@ -34,55 +75,111 @@ class StreamGrid:
         self.model = model
         self.frame_queue = queue.Queue(maxsize=50)
 
-        # Colors
-        self.colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
-                       (255, 255, 0), (255, 0, 255), (0, 255, 255),
+        # FPS tracking - Use deque for better performance
+        self.batch_times = deque(maxlen=10)
+        self.prediction_fps = 0.0
+
+        # Colors for source labels and detection boxes
+        self.colors = [(255, 0, 0), (104, 31, 17), (0, 0, 255),
+                       (128, 0, 255), (255, 0, 255), (0, 255, 255),
                        (255, 128, 0), (128, 0, 255)]
 
         # Video writer support
         self.save = save
+        self.video_writer = None
+        self.target_fps = 30
+
         if self.save:
-            self.video_writer = None
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             self.video_writer = cv2.VideoWriter(
-                f"streamgrid_output_{self.batch_size}_streams.avi", fourcc, 30,  # TODO: FPS auto adjust
+                f"streamgrid_output_{self.batch_size}_streams.mp4",
+                fourcc, self.target_fps,
                 (self.cols * self.cell_w, self.rows * self.cell_h)
             )
 
+        self.run()
+
     def get_color(self, class_idx):
-        return self.colors[class_idx % len(self.colors)]
+        """Get color for a given class index.
+
+        Args:
+            class_idx (int): Index of the class/source.
+
+        Returns:
+            tuple: RGB color tuple (r, g, b) with values 0-255.
+        """
+        return tuple(map(int, self.colors[class_idx % len(self.colors)]))
 
     def capture_video(self, source, source_id):
-        """Capture video frames with CPU optimizations."""
-        cap = cv2.VideoCapture(source)
+        """Capture video frames from a source in a separate thread.
 
-        # Reduce capture resolution for CPU
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer
+        Continuously captures frames from the specified source and adds them to
+        the processing queue. Handles different source types (files, cameras, streams)
+        with appropriate error handling and reconnection logic.
 
-        frame_count = 0
+        Args:
+            source (str or int): Video source (file path, camera index, or stream URL).
+            source_id (int): Unique identifier for this source (0-based index).
 
-        while self.running and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                continue
+        Note:
+            This method runs in a separate thread and will continue until
+            self.running is set to False or the source is exhausted.
+        """
+        try:
+            cap = cv2.VideoCapture(source)
+            if not cap.isOpened():
+                print(f"Failed to open source: {source}")
+                return
 
-            frame_count += 1
-            try:
-                self.frame_queue.put((source_id, frame), timeout=0.01)
-            except queue.Full:
-                pass
-            time.sleep(0.05)  # Slower for CPU
-        cap.release()
+            # Optimize capture settings for CPU processing
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer to minimize latency
+
+            frame_count = 0
+
+            while self.running and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    # Handle end of video file vs. stream disconnection
+                    if isinstance(source, str) and not source.isdigit():
+                        # Video file has ended
+                        print(f"Video file {source} finished")
+                        break
+                    else:
+                        # Camera/stream disconnected, try to reconnect
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+
+                frame_count += 1
+                try:
+                    # Non-blocking queue insertion
+                    self.frame_queue.put((source_id, frame), timeout=0.01)
+                except queue.Full:
+                    # Drop frame if queue is full to prevent memory buildup
+                    pass
+                time.sleep(0.05)  # Throttle for CPU efficiency
+
+            cap.release()
+
+        except Exception as e:
+            print(f"Error in capture_video for source {source}: {e}")
 
     def _batch_worker(self):
-        """Batch processing worker with CPU optimizations."""
+        """Process frames in batches for efficient YOLO inference.
+
+        Collects frames from multiple sources into batches and processes them
+        together for better GPU/CPU utilization. Calculates and maintains
+        prediction FPS statistics.
+
+        Note:
+            This method runs in a separate thread and handles all ML inference
+            and FPS calculation logic.
+        """
         batch_frames, batch_ids = [], []
 
         while self.running:
-            # Collect frames
+            # Collect frames up to batch_size
             while len(batch_frames) < self.batch_size:
                 try:
                     source_id, frame = self.frame_queue.get(timeout=0.01)
@@ -93,111 +190,160 @@ class StreamGrid:
 
             if batch_frames:
                 try:
+                    batch_start = time.time()
+
                     if self.model:
+                        # Run YOLO inference on the batch
                         results = self.model.predict(
                             batch_frames,
                             conf=0.25,
                             verbose=False,
-                            device='cpu',  # Force CPU
-                            half=False,  # No half precision on CPU
+                            device='cpu',
+                            half=False,
                         )
 
+                        # Update each source with its results
                         for source_id, frame, result in zip(batch_ids, batch_frames, results):
                             self.update_source(source_id, frame, result)
                     else:
+                        # No model, just display frames
                         for source_id, frame in zip(batch_ids, batch_frames):
                             self.update_source(source_id, frame)
+
+                    # Calculate prediction FPS
+                    batch_time = time.time() - batch_start
+                    self.batch_times.append(batch_time)
+
+                    if self.batch_times:
+                        avg_batch_time = sum(self.batch_times) / len(self.batch_times)
+                        self.prediction_fps = len(batch_frames) / avg_batch_time if avg_batch_time > 0 else 0
+
                 except Exception as e:
-                    print(f"Batch error: {e}")
+                    print(f"Batch processing error: {e}")
 
                 batch_frames.clear()
                 batch_ids.clear()
 
     def update_source(self, source_id, frame, yolo_results=None):
-        """Update frame and results for a source."""
+        """Update a source with new frame and detection results.
+
+        Args:
+            source_id (int): Index of the source to update.
+            frame (np.ndarray): Raw frame from the source.
+            yolo_results (optional): YOLO detection results for the frame.
+                If None, frame is displayed without detections.
+        """
         if source_id >= self.max_sources:
             return
 
         with self.lock:
-            # Resize frame
+            # Resize frame to fit cell dimensions
             resized = cv2.resize(frame, (self.cell_w, self.cell_h))
 
-            # Draw detections
+            # Draw detections if available
             detections = 0
             if yolo_results and yolo_results.boxes is not None:
                 detections = len(yolo_results.boxes)
                 resized = self.draw_boxes(resized, yolo_results, frame.shape[:2])
 
+            # Store processed frame and statistics
             self.frames[source_id] = resized
             self.stats[source_id] = {'detections': detections, 'time': time.time()}
 
     def draw_boxes(self, frame, results, orig_shape):
-        """Draw YOLO detections with proper scaling."""
+        """Draw YOLO detection boxes and labels on frame.
+
+        Uses Ultralytics' Annotator for consistent styling and proper scaling
+        of detection boxes from original frame dimensions to cell dimensions.
+
+        Args:
+            frame (np.ndarray): Resized frame to draw on.
+            results: YOLO detection results object.
+            orig_shape (tuple): Original frame shape (height, width).
+
+        Returns:
+            np.ndarray: Frame with detection boxes and labels drawn.
+        """
         if not results.boxes:
             return frame
 
-        # Scale factors
-        scale_x = self.cell_w / orig_shape[1]  # orig_shape from YOLO input
+        ann = Annotator(frame)
+
+        # Calculate scaling factors from original to cell dimensions
+        scale_x = self.cell_w / orig_shape[1]
         scale_y = self.cell_h / orig_shape[0]
 
+        # Extract detection data
         boxes = results.boxes.xyxy.cpu().numpy()
         confs = results.boxes.conf.cpu().numpy()
         classes = results.boxes.cls.cpu().numpy()
 
+        # Draw each detection
         for box, conf, cls in zip(boxes, confs, classes):
-            # Scale coordinates
+            # Scale coordinates to cell dimensions
             x1, y1, x2, y2 = (box * [scale_x, scale_y, scale_x, scale_y]).astype(int)
-
-            # Draw box
-            class_name = results.names[int(cls)]
-            color = self.get_color(int(cls))
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            # Draw label
-            label = f"{class_name}: {conf:.2f}"
-            (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
-            y_text = max(y1 - 5, 15)
-
-            cv2.rectangle(frame, (x1, y_text - h - 3), (x1 + w + 4, y_text + 3), color, -1)
-            text_color = (0, 0, 0) if sum(color) > 400 else (255, 255, 255)
-            cv2.putText(frame, label, (x1 + 2, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+            label = f"{results.names[int(cls)]}: {conf:.2f}"
+            ann.box_label([x1, y1, x2, y2], label=label, color=colors(int(cls), True))
 
         return frame
 
-    def __call__(self, *args, **kwargs):
-        self.run()
-
     def run(self):
-        """Run display loop."""
+        """Start the StreamGrid display and processing loop.
+
+        Initializes all worker threads, sets up the display window, and runs
+        the main event loop. Handles keyboard input for user interaction.
+
+        Keyboard Controls:
+            ESC: Exit the application
+            's': Toggle statistics display
+
+        Note:
+            This method blocks until the user exits. All cleanup is handled
+            automatically through the finally block.
+        """
         self.running = True
 
-        # Start capture threads
+        # Start capture threads for each source
         for i, source in enumerate(self.sources):
-            threading.Thread(target=self.capture_video, args=(source, i), daemon=True).start()
+            thread = threading.Thread(target=self.capture_video, args=(source, i), daemon=True)
+            thread.start()
 
-        # Start batch processing
-        threading.Thread(target=self._batch_worker, daemon=True).start()
+        # Start batch processing thread
+        batch_thread = threading.Thread(target=self._batch_worker, daemon=True)
+        batch_thread.start()
 
+        # Initialize display window
         cv2.namedWindow("StreamGrid", cv2.WINDOW_AUTOSIZE)
         print("StreamGrid running. Press ESC to exit, 's' to toggle stats")
 
-        while self.running:
-            self.update_display()
+        try:
+            while self.running:
+                self.update_display()
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == 27:  # ESC
-                break
-            elif key == ord('s'):
-                self.show_stats = not self.show_stats
+                # Handle keyboard input
+                key = cv2.waitKey(1) & 0xFF
+                if key == 27:  # ESC key
+                    break
+                elif key == ord('s'):  # 's' key
+                    self.show_stats = not self.show_stats
+                    print(f"Stats display: {'ON' if self.show_stats else 'OFF'}")
 
-        cv2.destroyAllWindows()
+        finally:
+            self.stop()
+            cv2.destroyAllWindows()
 
     def update_display(self):
-        """Update grid display."""
+        """Update the main grid display with current frames.
+
+        Composites all source frames into a single grid layout, adds source
+        labels with adaptive sizing and contrasting colors, and optionally
+        displays FPS statistics. Handles placeholder display for inactive sources.
+        """
         self.grid.fill(0)
 
         with self.lock:
             for i in range(self.max_sources):
+                # Calculate cell position in grid
                 row, col = divmod(i, self.cols)
                 y1, y2 = row * self.cell_h, (row + 1) * self.cell_h
                 x1, x2 = col * self.cell_w, (col + 1) * self.cell_w
@@ -205,36 +351,101 @@ class StreamGrid:
                 if i in self.frames:
                     frame = self.frames[i].copy()
                 else:
-                    # Create placeholder
+                    # Create placeholder for inactive sources
                     frame = np.zeros((self.cell_h, self.cell_w, 3), dtype=np.uint8)
 
-                    # Checkerboard pattern
+                    # Draw checkerboard pattern
                     for y in range(0, self.cell_h, 20):
                         for x in range(0, self.cell_w, 20):
                             if (x // 20 + y // 20) % 2:
                                 frame[y:y + 20, x:x + 20] = 20
 
-                    # Center "WAITING" text
+                    # Add "WAITING" text
                     text = "WAITING"
-                    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    wait_scale = max(0.4, min(1.0, self.cell_w / 400))
+                    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, wait_scale, 2)
                     cv2.putText(frame, text, ((self.cell_w - w) // 2, (self.cell_h - h) // 2 + h),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, wait_scale, (100, 100, 100), 2)
 
+                # Add source label with adaptive sizing
                 info = f"Source #{i}"
-                (text_width, text_height), baseline = cv2.getTextSize(info, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+                text_scale = max(1.2, min(0.8, self.cell_w / 400))
+                thickness = max(3, int(text_scale * 3))
+                padding = max(10, int(self.cell_w / 100))
 
-                cv2.rectangle(frame, (2, 2), (2 + text_width + 8, 2 + text_height + baseline + 8), (0, 0, 0),
-                              -1)
-                cv2.putText(frame, info, (6, 6 + text_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255),
-                            1)
+                # Calculate text dimensions
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    info, cv2.FONT_HERSHEY_SIMPLEX, text_scale, thickness
+                )
 
+                # Draw colored background for each source
+                bg_color = self.get_color(i)
+                cv2.rectangle(frame, (2, 2),
+                              (2 + text_width + padding * 2, 2 + text_height + baseline + padding * 2),
+                              bg_color, -1)
+
+                # Use luminance-based contrast for text color
+                r, g, b = bg_color
+                luminance = 0.299 * r + 0.587 * g + 0.114 * b
+                text_color = (0, 0, 0) if luminance > 127 else (255, 255, 255)
+
+                cv2.putText(frame, info, (2 + padding, 4 + padding + text_height),
+                            cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_color, thickness)
+
+                # Place frame in grid
                 self.grid[y1:y2, x1:x2] = frame
 
+        # Display FPS statistics if enabled
+        if self.show_stats and self.prediction_fps > 0:
+            self._draw_fps_overlay()
+
+        # Show the grid
         cv2.imshow("StreamGrid", self.grid)
 
-        if self.save:  # Write frame to video if save=True
+        # Write frame to video if recording
+        if self.save and self.video_writer:
             self.video_writer.write(self.grid)
 
+    def _draw_fps_overlay(self):
+        """Draw FPS overlay at the bottom of the grid.
+
+        Creates a centered FPS display with adaptive text sizing and
+        high-contrast background for optimal visibility.
+        """
+        fps_text = f"Prediction FPS: {self.prediction_fps:.1f}"
+
+        # Scale text size based on grid dimensions
+        text_scale = max(0.8, min(1.5, (self.cols * self.cell_w) / 800))
+        thickness = max(2, int(text_scale * 2))
+
+        # Calculate text dimensions
+        (text_w, text_h), baseline = cv2.getTextSize(
+            fps_text, cv2.FONT_HERSHEY_SIMPLEX, text_scale, thickness
+        )
+
+        # Position at bottom center
+        center_x = (self.cols * self.cell_w - text_w) // 2
+        bottom_y = self.rows * self.cell_h - max(10, int(text_scale * 10))
+
+        # Draw background rectangle
+        padding = max(8, int(text_scale * 8))
+        cv2.rectangle(self.grid,
+                      (center_x - padding, bottom_y - text_h - padding),
+                      (center_x + text_w + padding, bottom_y + padding),
+                      (255, 255, 255), -1)
+
+        # Draw text
+        cv2.putText(self.grid, fps_text, (center_x, bottom_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, text_scale, (104, 31, 17), thickness)
+
     def stop(self):
-        """Stop display."""
+        """Stop all processing and release resources.
+
+        Cleanly shuts down all threads, releases video capture and writer
+        resources, and prints completion message if video was saved.
+        """
         self.running = False
+
+        if self.save and self.video_writer:
+            self.video_writer.release()
+            print(f"Video saved as: streamgrid_output_{self.batch_size}_streams.mp4")
