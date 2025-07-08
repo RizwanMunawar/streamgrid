@@ -16,7 +16,7 @@ class StreamGrid:
         self.rows = int(math.ceil(self.max_sources / self.cols))
 
         # Auto cell size based on source count
-        sizes = {1: (1280, 720), 4: (1080, 720), 9: (480, 270), 16: (320, 180)}
+        sizes = {1: (1280, 720), 4: (1080, 720), 9: (640, 360), 16: (320, 180)}
         self.cell_w, self.cell_h = next((s for n, s in sizes.items() if self.max_sources <= n), (240, 135))
 
         self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
