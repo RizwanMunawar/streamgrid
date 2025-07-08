@@ -369,9 +369,9 @@ class StreamGrid:
 
                 # Add source label with adaptive sizing
                 info = f"Source #{i}"
-                text_scale = max(1.2, min(0.8, self.cell_w / 400))
-                thickness = max(3, int(text_scale * 3))
-                padding = max(10, int(self.cell_w / 100))
+                text_scale = max(1.6, min(0.8, self.cell_w / 400))
+                thickness = max(4, int(text_scale * 3))
+                padding = max(15, int(self.cell_w / 100))
 
                 # Calculate text dimensions
                 (text_width, text_height), baseline = cv2.getTextSize(
@@ -415,8 +415,8 @@ class StreamGrid:
         fps_text = f"Prediction FPS: {self.prediction_fps:.1f}"
 
         # Scale text size based on grid dimensions
-        text_scale = max(0.8, min(1.5, (self.cols * self.cell_w) / 800))
-        thickness = max(2, int(text_scale * 2))
+        text_scale = max(1.6, min(1.5, (self.cols * self.cell_w) / 800))
+        thickness = max(4, int(text_scale * 2))
 
         # Calculate text dimensions
         (text_w, text_h), baseline = cv2.getTextSize(
@@ -428,7 +428,7 @@ class StreamGrid:
         bottom_y = self.rows * self.cell_h - max(10, int(text_scale * 10))
 
         # Draw background rectangle
-        padding = max(8, int(text_scale * 8))
+        padding = max(20, int(text_scale * 8))
         cv2.rectangle(self.grid,
                       (center_x - padding, bottom_y - text_h - padding),
                       (center_x + text_w + padding, bottom_y + padding),
