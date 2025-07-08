@@ -7,6 +7,7 @@ import numpy as np
 from collections import deque
 from pathlib import Path
 import requests
+from tqdm import tqdm
 from ultralytics.utils.plotting import Annotator, colors
 
 
@@ -58,7 +59,6 @@ class StreamGrid:
             "grid_3.mp4",
             "grid_4.mp4"
         ]
-        print(sources)
         # Handle default sources
         if sources is None:
             print("No sources provided. Downloading default demo videos...")
@@ -117,6 +117,7 @@ class StreamGrid:
 
         Downloads demo videos from GitHub releases if they don't exist locally.
         Creates a 'demo_videos' directory to store downloaded files.
+        Uses tqdm progress bars for visual download feedback.
 
         Returns:
             list: List of local file paths to demo videos.
@@ -139,14 +140,27 @@ class StreamGrid:
                     response = requests.get(url, stream=True)
                     response.raise_for_status()
 
-                    with open(local_path, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            f.write(chunk)
+                    # Get total file size for progress bar
+                    total_size = int(response.headers.get('content-length', 0))
 
-                    print(f"✓ Downloaded {video_name}")
+                    with open(local_path, 'wb') as f:
+                        with tqdm(
+                                desc=video_name,
+                                total=total_size,
+                                unit='B',
+                                unit_scale=True,
+                                unit_divisor=1024,
+                                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
+                        ) as pbar:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                size = f.write(chunk)
+                                pbar.update(size)
 
                 except Exception as e:
                     print(f"✗ Failed to download {video_name}: {e}")
+                    # Clean up partial download
+                    if local_path.exists():
+                        local_path.unlink()
                     continue
             else:
                 print(f"✓ Found existing {video_name}")

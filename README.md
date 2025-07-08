@@ -1,5 +1,7 @@
 # StreamGrid ⚡
 
+https://github.com/user-attachments/assets/67bbb880-c412-4d99-af35-9a3bc1163c5e
+
 [![Publish to PyPI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml)
 
 
@@ -20,12 +22,13 @@ pip install streamgrid
 from ultralytics import YOLO
 from streamgrid import StreamGrid
 
+# Use assets videos for testing
 model = YOLO("yolo11n.pt")
-StreamGrid(model=model)  # Use assets videos for testing
+StreamGrid(model=model)  
 
 # Use your own videos
 sources = ["video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4"]
-StreamGrid(source=sources, model=model)
+StreamGrid(sources=sources, model=model)
 
 ```
 
