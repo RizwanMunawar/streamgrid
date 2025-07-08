@@ -23,8 +23,9 @@ from streamgrid import StreamGrid
 # Video paths
 paths = ["Video1.mp4", "Video2.mp4", "Video3.mp4", "Video4.mp4"]
 
-model = YOLO("yolo11n.pt")
-StreamGrid(paths, model).run()
+model = YOLO("yolo11n.pt")  # Ultralytics Model
+
+StreamGrid(paths, model)
 
 ```
 

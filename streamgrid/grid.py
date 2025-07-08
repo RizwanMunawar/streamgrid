@@ -154,6 +154,9 @@ class StreamGrid:
 
         return frame
 
+    def __call__(self, *args, **kwargs):
+        self.run()
+
     def run(self):
         """Run display loop."""
         self.running = True
