@@ -1,12 +1,11 @@
 # StreamGrid ⚡
 
-https://github.com/user-attachments/assets/67bbb880-c412-4d99-af35-9a3bc1163c5e
-
-[![Publish to PyPI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/publish.yml)
-[![PyPI Downloads](https://static.pepy.tech/badge/streamgrid)](https://pepy.tech/projects/streamgrid)
-
 **Ultra-fast multi-stream video display** - Display multiple video sources with object detection simultaneously using the CPU 
 or GPU device.
+
+[![Run tests](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml)
+[![PyPI Downloads](https://static.pepy.tech/badge/streamgrid)](https://pepy.tech/projects/streamgrid)
+[![PyPI version](https://img.shields.io/pypi/v/streamgrid.svg)](https://pypi.org/project/streamgrid/)
 
 ## Installation
 
