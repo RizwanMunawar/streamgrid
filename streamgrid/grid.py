@@ -8,7 +8,7 @@ from collections import deque
 from pathlib import Path
 import requests
 from tqdm import tqdm
-from .utils import LOGGER, get_optimal_grid_size
+from streamgrid.utils import LOGGER, get_optimal_grid_size
 from ultralytics.utils.plotting import Annotator, colors
 
 
