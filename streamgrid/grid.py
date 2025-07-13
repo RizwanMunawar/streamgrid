@@ -8,7 +8,7 @@ from collections import deque
 from pathlib import Path
 import requests
 from tqdm import tqdm
-from .utils import LOGGER
+from .utils import LOGGER, get_optimal_grid_size
 from ultralytics.utils.plotting import Annotator, colors
 
 
@@ -70,10 +70,7 @@ class StreamGrid:
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
         self.rows = int(math.ceil(self.max_sources / self.cols))
 
-        # Auto cell size based on source count
-        sizes = {1: (1280, 720), 4: (1080, 720), 9: (640, 360), 16: (320, 180)}
-        self.cell_w, self.cell_h = next((s for n, s in sizes.items() if self.max_sources <= n), (240, 135))
-
+        self.cell_w, self.cell_h = get_optimal_grid_size(self.max_sources, self.cols)  # Auto cell size based on sources
         self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
         self.frames = {}
         self.stats = {}
@@ -87,7 +84,7 @@ class StreamGrid:
 
         # Batch processing
         self.model = model
-        self.frame_queue = queue.Queue(maxsize=50)
+        self.frame_queue = queue.Queue(maxsize=max(50, self.max_sources * 4))  # Adaptive queue based on source count
 
         # FPS tracking - Use deque for better performance
         self.batch_times = deque(maxlen=10)
@@ -119,18 +116,7 @@ class StreamGrid:
         self.run()
 
     def get_default_videos(self):
-        """Download and return paths to default demo videos.
-
-        Downloads demo videos from GitHub releases if they don't exist locally.
-        Creates a 'demo_videos' directory to store downloaded files.
-        Uses tqdm progress bars for visual download feedback.
-
-        Returns:
-            list: List of local file paths to demo videos.
-
-        Raises:
-            RuntimeError: If unable to download demo videos.
-        """
+        """Downloads demo videos from GitHub releases if they don't exist locally."""
         demo_dir = Path("assets")
         demo_dir.mkdir(exist_ok=True)
 
@@ -191,7 +177,6 @@ class StreamGrid:
 
     def delayed_shutdown(self):
         """Shutdown after a delay to allow for cleanup."""
-        time.sleep(self.shutdown_delay)
         self.running = False
 
     def capture_video(self, source, source_id):
@@ -263,7 +248,7 @@ class StreamGrid:
             cap.release()
 
             if self.auto_shutdown and self.active_streams <= 0:  # Check if this was the last active stream
-                LOGGER.info(f"ℹ️ All streams finished. Initiating shutdown in {self.shutdown_delay} seconds...")
+                LOGGER.info(f"ℹ️ All streams finished. Initiating shutdown...")
                 shutdown_thread = threading.Thread(target=self.delayed_shutdown, daemon=True)
                 shutdown_thread.start()
 
@@ -306,7 +291,6 @@ class StreamGrid:
                             conf=0.25,
                             verbose=False,
                             device='cpu',
-                            half=False,
                         )
 
                         # Update each source with its results
@@ -474,36 +458,38 @@ class StreamGrid:
                     cv2.putText(frame, text, ((self.cell_w - w) // 2, (self.cell_h - h) // 2 + h),
                                 cv2.FONT_HERSHEY_SIMPLEX, wait_scale, (100, 100, 100), 2)
 
-                # Add source label with adaptive sizing
-                info = f"Source #{i}"
-                text_scale = max(1.6, min(0.8, self.cell_w / 400))
-                thickness = max(4, int(text_scale * 3))
-                padding = max(15, int(self.cell_w / 100))
+                if self.show_stats:
+                    # Add source label with adaptive sizing
+                    info = f"Source #{i}"
+                    text_scale = max(1.6, min(0.8, self.cell_w / 400))
+                    thickness = max(4, int(text_scale * 3))
+                    padding = max(15, int(self.cell_w / 100))
 
-                # Calculate text dimensions
-                (text_width, text_height), baseline = cv2.getTextSize(
-                    info, cv2.FONT_HERSHEY_SIMPLEX, text_scale, thickness
-                )
+                    # Calculate text dimensions
+                    (text_width, text_height), baseline = cv2.getTextSize(
+                        info, cv2.FONT_HERSHEY_SIMPLEX, text_scale, thickness
+                    )
 
-                # Draw colored background for each source
-                bg_color = self.get_color(i)
-                cv2.rectangle(frame, (2, 2),
-                              (2 + text_width + padding * 2, 2 + text_height + baseline + padding * 2),
-                              bg_color, -1)
+                    # Draw colored background for each source
+                    bg_color = self.get_color(i)
+                    cv2.rectangle(frame, (2, 2),
+                                  (2 + text_width + padding * 2, 2 + text_height + baseline + padding * 2),
+                                  bg_color, -1)
 
-                # Use luminance-based contrast for text color
-                r, g, b = bg_color
-                luminance = 0.299 * r + 0.587 * g + 0.114 * b
-                text_color = (0, 0, 0) if luminance > 127 else (255, 255, 255)
+                    # Use luminance-based contrast for text color
+                    r, g, b = bg_color
+                    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+                    text_color = (0, 0, 0) if luminance > 127 else (255, 255, 255)
 
-                cv2.putText(frame, info, (2 + padding, 4 + padding + text_height),
-                            cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_color, thickness)
+                    cv2.putText(frame, info, (2 + padding, 4 + padding + text_height),
+                                cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_color, thickness)
 
                 # Place frame in grid
                 self.grid[y1:y2, x1:x2] = frame
 
         # Display FPS statistics if enabled
         if self.show_stats and self.prediction_fps > 0:
+
             self._draw_fps_overlay()
 
         # Show the grid
