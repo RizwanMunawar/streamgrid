@@ -3,5 +3,6 @@
 __version__ = "1.0.0"
 
 from .grid import StreamGrid
+from .utils import optimize
 
 __all__ = ["StreamGrid"]

@@ -8,6 +8,7 @@ from collections import deque
 from pathlib import Path
 import requests
 from tqdm import tqdm
+from .utils import LOGGER
 from ultralytics.utils.plotting import Annotator, colors
 
 
@@ -61,11 +62,11 @@ class StreamGrid:
         ]
         # Handle default sources
         if sources is None:
-            print("No sources provided. Downloading default demo videos...")
+            LOGGER.warning("⚠️ No sources provided. Downloading default demo videos.")
             sources = self.get_default_videos()
 
         self.sources = sources
-        self.max_sources = self.batch_size = len(sources)
+        self.max_sources = self.batch_size = self.active_streams = len(sources)
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
         self.rows = int(math.ceil(self.max_sources / self.cols))
 
@@ -110,6 +111,11 @@ class StreamGrid:
                 (self.cols * self.cell_w, self.rows * self.cell_h)
             )
 
+        # Add these new attributes
+        self.stream_threads = []
+        self.auto_shutdown = True  # Control auto-shutdown behavior
+        self.shutdown_delay = 3.0  # Seconds to wait after streams end before shutdown
+
         self.run()
 
     def get_default_videos(self):
@@ -125,7 +131,7 @@ class StreamGrid:
         Raises:
             RuntimeError: If unable to download demo videos.
         """
-        demo_dir = Path("demo_videos")
+        demo_dir = Path("assets")
         demo_dir.mkdir(exist_ok=True)
 
         local_paths = []
@@ -134,7 +140,7 @@ class StreamGrid:
             local_path = demo_dir / video_name
 
             if not local_path.exists():
-                print(f"Downloading {video_name}...")
+                LOGGER.info(f"ℹ️ Downloading {video_name}...")
                 try:
                     url = f"{self.GITHUB_ASSETS_BASE}{video_name}"
                     response = requests.get(url, stream=True)
@@ -157,13 +163,13 @@ class StreamGrid:
                                 pbar.update(size)
 
                 except Exception as e:
-                    print(f"✗ Failed to download {video_name}: {e}")
+                    LOGGER.error(f"❌ Failed to download {video_name}: {e}")
                     # Clean up partial download
                     if local_path.exists():
                         local_path.unlink()
                     continue
             else:
-                print(f"✓ Found existing {video_name}")
+                LOGGER.info(f"ℹ️ Found existing {video_name}")
 
             local_paths.append(str(local_path))
 
@@ -183,6 +189,11 @@ class StreamGrid:
         """
         return tuple(map(int, self.colors[class_idx % len(self.colors)]))
 
+    def delayed_shutdown(self):
+        """Shutdown after a delay to allow for cleanup."""
+        time.sleep(self.shutdown_delay)
+        self.running = False
+
     def capture_video(self, source, source_id):
         """Capture video frames from a source in a separate thread.
 
@@ -201,7 +212,9 @@ class StreamGrid:
         try:
             cap = cv2.VideoCapture(source)
             if not cap.isOpened():
-                print(f"Failed to open source: {source}")
+                LOGGER.error(f"❌ Failed to open source: {source}")
+                with self.lock:
+                    self.active_streams -= 1
                 return
 
             # Optimize capture settings for CPU processing
@@ -210,20 +223,34 @@ class StreamGrid:
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer to minimize latency
 
             frame_count = 0
+            no_frame_count = 0
+            max_retries = 5  # Number of retries before considering stream dead
 
             while self.running and cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     # Handle end of video file vs. stream disconnection
                     if isinstance(source, str) and not source.isdigit():
-                        # Video file has ended
-                        print(f"Video file {source} finished")
-                        break
+                        no_frame_count += 1
+                        if no_frame_count > max_retries:
+                            with self.lock:
+                                self.active_streams -= 1
+                                LOGGER.info(f"ℹ️ Source {source} ended. Active streams: {self.active_streams}")
+                            break
+                        time.sleep(0.1)
+                        continue
                     else:
-                        # Camera/stream disconnected, try to reconnect
+                        no_frame_count += 1  # Camera/stream disconnected, try to reconnect
+                        if no_frame_count > max_retries:
+                            with self.lock:
+                                self.active_streams -= 1
+                                LOGGER.warning(f"Source {source_id} disconnected. Active streams: {self.active_streams}")
+                            break
                         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        time.sleep(0.1)
                         continue
 
+                no_frame_count = 0   # Reset retry counter on successful frame read
                 frame_count += 1
                 try:
                     # Non-blocking queue insertion
@@ -235,8 +262,15 @@ class StreamGrid:
 
             cap.release()
 
+            if self.auto_shutdown and self.active_streams <= 0:  # Check if this was the last active stream
+                LOGGER.info(f"ℹ️ All streams finished. Initiating shutdown in {self.shutdown_delay} seconds...")
+                shutdown_thread = threading.Thread(target=self.delayed_shutdown, daemon=True)
+                shutdown_thread.start()
+
         except Exception as e:
-            print(f"Error in capture_video for source {source}: {e}")
+            LOGGER.error(f"❌ Error in capture_video for source {source}: {e}")
+            with self.lock:
+                self.active_streams -= 1
 
     def _batch_worker(self):
         """Process frames in batches for efficient YOLO inference.
@@ -292,7 +326,7 @@ class StreamGrid:
                         self.prediction_fps = len(batch_frames) / avg_batch_time if avg_batch_time > 0 else 0
 
                 except Exception as e:
-                    print(f"Batch processing error: {e}")
+                    LOGGER.error(f"❌ Batch processing error: {e}")
 
                 batch_frames.clear()
                 batch_ids.clear()
@@ -387,7 +421,7 @@ class StreamGrid:
 
         # Initialize display window
         cv2.namedWindow("StreamGrid", cv2.WINDOW_AUTOSIZE)
-        print("StreamGrid running. Press ESC to exit, 's' to toggle stats")
+        LOGGER.info("ℹ️ Application running. Press ESC to exit, 's' to toggle stats")
 
         try:
             while self.running:
@@ -399,7 +433,7 @@ class StreamGrid:
                     break
                 elif key == ord('s'):  # 's' key
                     self.show_stats = not self.show_stats
-                    print(f"Stats display: {'ON' if self.show_stats else 'OFF'}")
+                    LOGGER.info(f"ℹ️ Stats display: {'ON' if self.show_stats else 'OFF'}")
 
         finally:
             self.stop()
@@ -517,8 +551,26 @@ class StreamGrid:
         Cleanly shuts down all threads, releases video capture and writer
         resources, and prints completion message if video was saved.
         """
+        if not self.running:
+            return  # Already stopped
+
+        LOGGER.info("ℹ️ Shutting down StreamGrid...")
         self.running = False
+
+        try:  # Clear the frame queue to prevent blocking
+            while not self.frame_queue.empty():
+                self.frame_queue.get_nowait()
+        except:
+            pass
+
+        for i, thread in enumerate(self.stream_threads):  # Wait for threads to finish (with timeout)
+            thread.join(timeout=0.5)
+
 
         if self.save and self.video_writer:
             self.video_writer.release()
-            print(f"Video saved as: streamgrid_output_{self.batch_size}_streams.mp4")
+            LOGGER.info(f"✅ Video saved as: streamgrid_output_{self.batch_size}_streams.mp4")
+
+        with self.lock:  # Clear cached frames to free memory
+            self.frames.clear()
+            self.stats.clear()
