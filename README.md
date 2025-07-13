@@ -1,9 +1,10 @@
 # StreamGrid ⚡
 
-**Ultra-fast multi-stream video display** - Display multiple video sources with object detection simultaneously using the CPU 
-or GPU device.
+Ultra-fast multi-stream video display, Run real-time object detection across multiple video feeds with real-time speed. Whether you're on CPU or GPU, StreamGrid handles the load like a champ.
 
-[![Run tests](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml)
+From smart surveillance to AI-powered dashboards, StreamGrid makes it effortless to display and analyze multiple video streams side-by-side, with [Ultralytics](https://github.com/ultralytics/ultralytics) YOLO-based detection running on all of them in real time.
+
+[![Run CI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml)
 [![PyPI Downloads](https://static.pepy.tech/badge/streamgrid)](https://pepy.tech/projects/streamgrid)
 [![PyPI version](https://img.shields.io/pypi/v/streamgrid.svg)](https://pypi.org/project/streamgrid/)
 
