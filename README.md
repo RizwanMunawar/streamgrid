@@ -4,7 +4,7 @@ Ultra-fast multi-stream video display, Run real-time object detection across mul
 
 From smart surveillance to AI-powered dashboards, StreamGrid makes it effortless to display and analyze multiple video streams side-by-side, with [Ultralytics](https://github.com/ultralytics/ultralytics) YOLO-based detection running on all of them in real time.
 
-[![Run tests](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml)
+[![Run CI](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml/badge.svg)](https://github.com/RizwanMunawar/streamgrid/actions/workflows/ci.yml)
 [![PyPI Downloads](https://static.pepy.tech/badge/streamgrid)](https://pepy.tech/projects/streamgrid)
 [![PyPI version](https://img.shields.io/pypi/v/streamgrid.svg)](https://pypi.org/project/streamgrid/)
 
