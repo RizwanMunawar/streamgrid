@@ -34,8 +34,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development",
     "Topic :: Scientific/Engineering",
-    "Topic :: Computer Vision",
-    "Topic :: Multiple Stream Inference",
     "Topic :: Multimedia :: Video :: Display",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Operating System :: POSIX :: Linux",
