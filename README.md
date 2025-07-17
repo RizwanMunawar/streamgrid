@@ -30,6 +30,9 @@ StreamGrid(model=model)
 sources = ["video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4"]
 StreamGrid(sources=sources, model=model)
 
+# Inference on GPU
+StreamGrid(sources=sources, device="cuda")
+
 ```
 
 ## Performance (Beta, final benchmarks will be released soon)
