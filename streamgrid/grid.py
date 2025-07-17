@@ -39,18 +39,15 @@ class StreamGrid:
         video_writer: OpenCV video writer object.
     """
 
-    def __init__(self, sources=None, model=None, save=True):
+    def __init__(self, sources=None, model=None, save=True, device="cpu"):
         """Initialize StreamGrid with video sources and configuration.
 
         Args:
-            sources (list): List of video sources. Can be:
-                - File paths (str): "video.mp4", "stream.avi"
-                - Camera indices (int): 0, 1, 2
-                - Stream URLs (str): "rtsp://camera_url"
+            sources (list): List of video sources. Can be, File paths (str): "video.mp4", "stream.avi",
+                Camera indices (int): 0, 1, 2, Stream URLs (str): "rtsp://camera_url"
             model (optional): YOLO model instance for object detection.
-                If None, only displays video without detection.
-            save (bool, optional): Whether to save output video. Defaults to True.
-                Output will be saved as "streamgrid_output_{N}_streams.mp4".
+            save (bool, optional): Save output video. Output will be saved as "streamgrid_output_{N}_streams.mp4".
+            device (str, optional): Wheather to run inference on GPU or CPU device.
         """
         # GitHub repository URLs for default videos
         self.GITHUB_ASSETS_BASE = "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
@@ -66,6 +63,7 @@ class StreamGrid:
             sources = self.get_default_videos()
 
         self.sources = sources
+        self.device = device
         self.max_sources = self.batch_size = self.active_streams = len(sources)
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
         self.rows = int(math.ceil(self.max_sources / self.cols))
@@ -238,11 +236,9 @@ class StreamGrid:
                 no_frame_count = 0   # Reset retry counter on successful frame read
                 frame_count += 1
                 try:
-                    # Non-blocking queue insertion
-                    self.frame_queue.put((source_id, frame), timeout=0.01)
+                    self.frame_queue.put((source_id, frame), timeout=0.01)  # Non-blocking queue insertion
                 except queue.Full:
-                    # Drop frame if queue is full to prevent memory buildup
-                    pass
+                    pass  # Drop frame if queue is full to prevent memory buildup
                 time.sleep(0.05)  # Throttle for CPU efficiency
 
             cap.release()
@@ -257,22 +253,13 @@ class StreamGrid:
             with self.lock:
                 self.active_streams -= 1
 
-    def _batch_worker(self):
-        """Process frames in batches for efficient YOLO inference.
-
-        Collects frames from multiple sources into batches and processes them
-        together for better GPU/CPU utilization. Calculates and maintains
-        prediction FPS statistics.
-
-        Note:
-            This method runs in a separate thread and handles all ML inference
-            and FPS calculation logic.
-        """
+    def process_batch(self):
+        """Collects frames from multiple sources into batches and processes them together for better GPU/CPU
+        utilization. Calculates and maintains prediction FPS statistics."""
         batch_frames, batch_ids = [], []
 
         while self.running:
-            # Collect frames up to batch_size
-            while len(batch_frames) < self.batch_size:
+            while len(batch_frames) < self.batch_size:  # Collect frames up to batch_size
                 try:
                     source_id, frame = self.frame_queue.get(timeout=0.01)
                     batch_frames.append(frame)
@@ -290,7 +277,7 @@ class StreamGrid:
                             batch_frames,
                             conf=0.25,
                             verbose=False,
-                            device='cpu',
+                            device=self.device,
                         )
 
                         # Update each source with its results
@@ -400,7 +387,7 @@ class StreamGrid:
             thread.start()
 
         # Start batch processing thread
-        batch_thread = threading.Thread(target=self._batch_worker, daemon=True)
+        batch_thread = threading.Thread(target=self.process_batch, daemon=True)
         batch_thread.start()
 
         # Initialize display window
