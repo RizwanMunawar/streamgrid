@@ -26,9 +26,9 @@ def parse_kv_args(args):
 
 def main():
     parser = argparse.ArgumentParser(description="StreamGrid CLI",
-                                     epilog="Examples:\n  streamgrid-cli\n  "
-                                            "streamgrid-cli sources=vid1.mp4,vid2.mp4\n  "
-                                            "streamgrid-cli model=yolo11n.pt device=cuda save=false")
+                                     epilog="Examples:\n  streamgrid\n  "
+                                            "streamgrid sources=[vid1.mp4, vid2.mp4]\n  "
+                                            "streamgrid model=yolo11n.pt device=cuda save=false")
     parser.add_argument('args', nargs='*', help='key=value pairs or source paths')
     config = parse_kv_args(parser.parse_args().args)
     sources = config.pop('sources', None)  # Process sources
