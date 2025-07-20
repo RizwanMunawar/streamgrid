@@ -45,6 +45,9 @@ dependencies = [
     "ultralytics",
 ]
 
+[project.scripts]
+streamgrid-cli = "streamgrid.__init__:main"
+
 [project.urls]
 Homepage = "https://github.com/RizwanMunawar/streamgrid"
 Repository = "https://github.com/RizwanMunawar/streamgrid"
