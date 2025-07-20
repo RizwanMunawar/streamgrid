@@ -1,5 +1,4 @@
-"""StreamGrid - Ultra-fast multi-stream video display. Class for
-handling command-line interface for multi-stream video display."""
+"""StreamGrid - Ultra-fast multi-stream video display."""
 
 __version__ = "1.0.4"
 
