@@ -1,5 +1,8 @@
 """StreamGrid - Ultra-fast multi-stream video display. Class for
 handling command-line interface for multi-stream video display."""
+
+__version__ = "1.0.4"
+
 import argparse
 import sys
 from pathlib import Path
@@ -7,9 +10,7 @@ from ultralytics import YOLO
 from .grid import StreamGrid
 from .utils import optimize
 
-__version__ = "1.0.4"
 __all__ = ["StreamGrid"]
-
 
 def parse_kv_args(args):
     """Parse key=value arguments into dict."""
