@@ -32,7 +32,16 @@ StreamGrid(sources=sources, model=model)
 
 # Inference on GPU
 StreamGrid(sources=sources, device="cuda")
+```
+### CLI (Command Line Interface)
+```bash
+streamgrid model=yolo11n.pt
 
+# Run inference with GPU device
+streamgrid model=yolo11n.pt device=0  
+
+# save the output
+streamgrid model=yolo11n.pt device=cpu save=True
 ```
 
 ## Performance (Beta, final benchmarks will be released soon)
