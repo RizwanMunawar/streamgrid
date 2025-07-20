@@ -33,7 +33,9 @@ StreamGrid(sources=sources, model=model)
 # Inference on GPU
 StreamGrid(sources=sources, device="cuda")
 ```
+
 ### CLI (Command Line Interface)
+
 ```bash
 streamgrid model=yolo11n.pt
 
