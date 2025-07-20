@@ -11,7 +11,6 @@ from .utils import optimize
 
 __all__ = ["StreamGrid"]
 
-
 def parse_kv_args(args):
     """Parse key=value arguments into dict."""
     full_cmd = ' '.join(args)
@@ -19,7 +18,6 @@ def parse_kv_args(args):
 
     config = {}
     kv_pairs = re.findall(r'(\w+)=([^=]+?)(?=\s+\w+=|$)', full_cmd)
-
     for k, v in kv_pairs:
         v = v.strip()
         if v.startswith('[') and v.endswith(']'):  # Handle Python list literals
