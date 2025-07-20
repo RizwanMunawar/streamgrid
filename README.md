@@ -44,6 +44,9 @@ streamgrid model=yolo11n.pt device=0
 
 # save the output
 streamgrid model=yolo11n.pt device=cpu save=True
+
+# Pass source
+streamgrid model=yolo11n.pt sources=["video1.mp4", "video2.mp4"]
 ```
 
 ## Performance (Beta, final benchmarks will be released soon)
