@@ -46,7 +46,7 @@ dependencies = [
 ]
 
 [project.scripts]
-streamgrid-cli = "streamgrid.__init__:main"
+streamgrid = "streamgrid.__init__:main"
 
 [project.urls]
 Homepage = "https://github.com/RizwanMunawar/streamgrid"
