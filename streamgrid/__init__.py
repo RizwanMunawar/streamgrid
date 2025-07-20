@@ -11,26 +11,38 @@ from .utils import optimize
 
 __all__ = ["StreamGrid"]
 
+
 def parse_kv_args(args):
     """Parse key=value arguments into dict."""
+    full_cmd = ' '.join(args)
+    import re
+
     config = {}
-    for arg in args:
-        if '=' in arg:
-            k, v = arg.split('=', 1)
-            config[k] = {'true': True, 'false': False}.get(v.lower(), int(v) if v.isdigit() else float(v)
-            if v.replace('.', '').isdigit() else v)
-        else:
-            config.setdefault('sources', []).append(int(arg) if arg.isdigit() else arg)
+    kv_pairs = re.findall(r'(\w+)=([^=]+?)(?=\s+\w+=|$)', full_cmd)
+
+    for k, v in kv_pairs:
+        v = v.strip()
+        if v.startswith('[') and v.endswith(']'):  # Handle Python list literals
+            import ast
+            try:
+                config[k] = ast.literal_eval(v)
+                continue
+            except:
+                pass
+        config[k] = {'true': True, 'false': False}.get(v.lower(),  # Handle other types
+                                                       int(v) if v.isdigit() else
+                                                       float(v) if v.replace('.', '').isdigit() else v)
     return config
 
 
 def main():
     parser = argparse.ArgumentParser(description="StreamGrid")
-    parser.add_argument('args', nargs='*', help='key=value pairs i.e device="cuda"')
+    parser.add_argument('args', nargs='*', help='key=value pairs or source paths')
     config = parse_kv_args(parser.parse_args().args)
     sources = config.pop('sources', None)  # Process sources
     if sources and isinstance(sources, str):
-        sources = [s.strip() for s in sources.split(',')]
+        delimiter = ';' if ';' in sources else ','   # Support both comma and semicolon delimiters
+        sources = [s.strip().strip('[]"\'') for s in sources.strip('[]').split(delimiter)]
 
     model = None  # Load model
     if 'model' in config and config['model'] != 'none':
