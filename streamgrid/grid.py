@@ -397,7 +397,7 @@ class StreamGrid:
         try:
             while self.running:
                 self.update_display()
-                key = cv2.waitKey(1) & 0xFF  # Handle keyboard input
+                key = cv2.waitKey(1) & 0xFF  # Handle keyboard input.
                 if key == 27:  # ESC key
                     break
                 elif key == ord('s'):  # 's' key
