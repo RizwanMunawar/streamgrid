@@ -397,15 +397,12 @@ class StreamGrid:
         try:
             while self.running:
                 self.update_display()
-
-                # Handle keyboard input
-                key = cv2.waitKey(1) & 0xFF
+                key = cv2.waitKey(1) & 0xFF  # Handle keyboard input.
                 if key == 27:  # ESC key
                     break
                 elif key == ord('s'):  # 's' key
                     self.show_stats = not self.show_stats
                     LOGGER.info(f"ℹ️ Stats display: {'ON' if self.show_stats else 'OFF'}")
-
         finally:
             self.stop()
             cv2.destroyAllWindows()
@@ -471,22 +468,17 @@ class StreamGrid:
                     cv2.putText(frame, info, (2 + padding, 4 + padding + text_height),
                                 cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_color, thickness)
 
-                # Place frame in grid
-                self.grid[y1:y2, x1:x2] = frame
+                self.grid[y1:y2, x1:x2] = frame  # Place frame in grid.
 
-        # Display FPS statistics if enabled
         if self.show_stats and self.prediction_fps > 0:
+            self.display_fps()  # Display FPS statistics if enabled.
 
-            self._draw_fps_overlay()
+        cv2.imshow("StreamGrid", self.grid)  # Show the grid.
 
-        # Show the grid
-        cv2.imshow("StreamGrid", self.grid)
-
-        # Write frame to video if recording
         if self.save and self.video_writer:
-            self.video_writer.write(self.grid)
+            self.video_writer.write(self.grid)  # Write frame to video if save enabled.
 
-    def _draw_fps_overlay(self):
+    def display_fps(self):
         """Draw FPS overlay at the bottom of the grid.
 
         Creates a centered FPS display with adaptive text sizing and
