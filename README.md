@@ -32,6 +32,9 @@ StreamGrid(sources=sources, model=model)
 
 # Inference on GPU
 StreamGrid(sources=sources, device="cuda")
+
+# Store stream results in CSV file
+StreamGrid(sources=sources, analytics=True)
 ```
 
 ### CLI (Command Line Interface)
