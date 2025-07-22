@@ -47,6 +47,9 @@ streamgrid model=yolo11n.pt device=cpu save=True
 
 # Pass source
 streamgrid model=yolo11n.pt sources=["video1.mp4", "video2.mp4"]
+
+# Store Stream results in CSV file
+streamgrid model=yolo11n.pt analytics=True
 ```
 
 ## Performance (Beta, final benchmarks will be released soon)
