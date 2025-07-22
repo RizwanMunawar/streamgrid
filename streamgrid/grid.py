@@ -9,6 +9,7 @@ from pathlib import Path
 import requests
 from tqdm import tqdm
 from streamgrid.utils import LOGGER, get_optimal_grid_size
+from analytics import StreamAnalytics
 from ultralytics.utils.plotting import Annotator, colors
 
 
@@ -39,7 +40,7 @@ class StreamGrid:
         video_writer: OpenCV video writer object.
     """
 
-    def __init__(self, sources=None, model=None, save=True, device="cpu"):
+    def __init__(self, sources=None, model=None, save=True, device="cpu", analytics=False):
         """Initialize StreamGrid with video sources and configuration.
 
         Args:
@@ -48,6 +49,7 @@ class StreamGrid:
             model (optional): YOLO model instance for object detection.
             save (bool, optional): Save output video. Output will be saved as "streamgrid_output_{N}_streams.mp4".
             device (str, optional): Wheather to run inference on GPU or CPU device.
+            analytics (bool, optional): Wheather to store streams results in CSV file.
         """
         # GitHub repository URLs for default videos
         self.GITHUB_ASSETS_BASE = "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
@@ -111,6 +113,7 @@ class StreamGrid:
         self.auto_shutdown = True  # Control auto-shutdown behavior
         self.shutdown_delay = 3.0  # Seconds to wait after streams end before shutdown
 
+        self.analytics = StreamAnalytics() if analytics else None  # Enable analytics storage.
         self.run()
 
     def get_default_videos(self):
@@ -324,6 +327,9 @@ class StreamGrid:
                 detections = len(yolo_results.boxes)
                 resized = self.draw_boxes(resized, yolo_results, frame.shape[:2])
 
+            if self.analytics:
+                self.analytics.log(source_id, detections, self.prediction_fps)
+
             # Store processed frame and statistics
             self.frames[source_id] = resized
             self.stats[source_id] = {'detections': detections, 'time': time.time()}
@@ -531,6 +537,8 @@ class StreamGrid:
         for i, thread in enumerate(self.stream_threads):  # Wait for threads to finish (with timeout)
             thread.join(timeout=0.5)
 
+        if self.analytics:
+            self.analytics.summary()
 
         if self.save and self.video_writer:
             self.video_writer.release()
