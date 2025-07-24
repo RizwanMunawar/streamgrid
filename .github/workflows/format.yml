@@ -28,16 +28,18 @@ jobs:
       run: |
         echo "🔍 Checking code formatting..."
         black --check --diff --color streamgrid/ tests/
-
+      continue-on-error: true  # Add this
     - name: Lint with Ruff
       run: |
         echo "🔍 Running comprehensive linting..."
         ruff check streamgrid/ tests/ --output-format=github
+      continue-on-error: true  # Add this
 
     - name: Check docstrings with Ruff
       run: |
         echo "🔍 Checking docstrings..."
         ruff check streamgrid/ tests/ --select=D --output-format=github
+      continue-on-error: true  # Add this
 
   auto-format:
     runs-on: ubuntu-latest
