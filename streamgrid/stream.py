@@ -1,7 +1,6 @@
 import threading
 import time
 import cv2
-import numpy as np
 
 
 class VideoStream:
