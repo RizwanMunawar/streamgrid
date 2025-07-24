@@ -40,7 +40,9 @@ class StreamGrid:
         video_writer: OpenCV video writer object.
     """
 
-    def __init__(self, sources=None, model=None, save=True, device="cpu", analytics=False):
+    def __init__(
+        self, sources=None, model=None, save=True, device="cpu", analytics=False
+    ):
         """Initialize StreamGrid with video sources and configuration.
 
         Args:
@@ -52,13 +54,10 @@ class StreamGrid:
             analytics (bool, optional): Wheather to store streams results in CSV file.
         """
         # GitHub repository URLs for default videos
-        self.GITHUB_ASSETS_BASE = "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
-        self.DEFAULT_VIDEOS = [
-            "grid_1.mp4",
-            "grid_2.mp4",
-            "grid_3.mp4",
-            "grid_4.mp4"
-        ]
+        self.GITHUB_ASSETS_BASE = (
+            "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
+        )
+        self.DEFAULT_VIDEOS = ["grid_1.mp4", "grid_2.mp4", "grid_3.mp4", "grid_4.mp4"]
         # Handle default sources
         if sources is None:
             LOGGER.warning("⚠️ No sources provided. Downloading default demo videos.")
@@ -70,8 +69,12 @@ class StreamGrid:
         self.cols = int(math.ceil(math.sqrt(self.max_sources)))
         self.rows = int(math.ceil(self.max_sources / self.cols))
 
-        self.cell_w, self.cell_h = get_optimal_grid_size(self.max_sources, self.cols)  # Auto cell size based on sources
-        self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
+        self.cell_w, self.cell_h = get_optimal_grid_size(
+            self.max_sources, self.cols
+        )  # Auto cell size based on sources
+        self.grid = np.zeros(
+            (self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8
+        )
         self.frames = {}
         self.stats = {}
         self.show_stats = True
@@ -84,16 +87,25 @@ class StreamGrid:
 
         # Batch processing
         self.model = model
-        self.frame_queue = queue.Queue(maxsize=max(50, self.max_sources * 4))  # Adaptive queue based on source count
+        self.frame_queue = queue.Queue(
+            maxsize=max(50, self.max_sources * 4)
+        )  # Adaptive queue based on source count
 
         # FPS tracking - Use deque for better performance
         self.batch_times = deque(maxlen=10)
         self.prediction_fps = 0.0
 
         # Colors for source labels and detection boxes
-        self.colors = [(255, 0, 0), (104, 31, 17), (0, 0, 255),
-                       (128, 0, 255), (255, 0, 255), (0, 255, 255),
-                       (255, 128, 0), (128, 0, 255)]
+        self.colors = [
+            (255, 0, 0),
+            (104, 31, 17),
+            (0, 0, 255),
+            (128, 0, 255),
+            (255, 0, 255),
+            (0, 255, 255),
+            (255, 128, 0),
+            (128, 0, 255),
+        ]
 
         # Video writer support
         self.save = save
@@ -101,11 +113,12 @@ class StreamGrid:
         self.target_fps = 30
 
         if self.save:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self.video_writer = cv2.VideoWriter(
                 f"streamgrid_output_{self.batch_size}_streams.mp4",
-                fourcc, self.target_fps,
-                (self.cols * self.cell_w, self.rows * self.cell_h)
+                fourcc,
+                self.target_fps,
+                (self.cols * self.cell_w, self.rows * self.cell_h),
             )
 
         # Add these new attributes
@@ -113,7 +126,9 @@ class StreamGrid:
         self.auto_shutdown = True  # Control auto-shutdown behavior
         self.shutdown_delay = 3.0  # Seconds to wait after streams end before shutdown
 
-        self.analytics = StreamAnalytics() if analytics else None  # Enable analytics storage.
+        self.analytics = (
+            StreamAnalytics() if analytics else None
+        )  # Enable analytics storage.
         self.run()
 
     def get_default_videos(self):
@@ -134,16 +149,16 @@ class StreamGrid:
                     response.raise_for_status()
 
                     # Get total file size for progress bar
-                    total_size = int(response.headers.get('content-length', 0))
+                    total_size = int(response.headers.get("content-length", 0))
 
-                    with open(local_path, 'wb') as f:
+                    with open(local_path, "wb") as f:
                         with tqdm(
-                                desc=video_name,
-                                total=total_size,
-                                unit='B',
-                                unit_scale=True,
-                                unit_divisor=1024,
-                                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
+                            desc=video_name,
+                            total=total_size,
+                            unit="B",
+                            unit_scale=True,
+                            unit_divisor=1024,
+                            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
                         ) as pbar:
                             for chunk in response.iter_content(chunk_size=8192):
                                 size = f.write(chunk)
@@ -221,34 +236,46 @@ class StreamGrid:
                         if no_frame_count > max_retries:
                             with self.lock:
                                 self.active_streams -= 1
-                                LOGGER.info(f"ℹ️ Source {source} ended. Active streams: {self.active_streams}")
+                                LOGGER.info(
+                                    f"ℹ️ Source {source} ended. Active streams: {self.active_streams}"
+                                )
                             break
                         time.sleep(0.1)
                         continue
                     else:
-                        no_frame_count += 1  # Camera/stream disconnected, try to reconnect
+                        no_frame_count += (
+                            1  # Camera/stream disconnected, try to reconnect
+                        )
                         if no_frame_count > max_retries:
                             with self.lock:
                                 self.active_streams -= 1
-                                LOGGER.warning(f"Source {source_id} disconnected. Active streams: {self.active_streams}")
+                                LOGGER.warning(
+                                    f"Source {source_id} disconnected. Active streams: {self.active_streams}"
+                                )
                             break
                         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                         time.sleep(0.1)
                         continue
 
-                no_frame_count = 0   # Reset retry counter on successful frame read
+                no_frame_count = 0  # Reset retry counter on successful frame read
                 frame_count += 1
                 try:
-                    self.frame_queue.put((source_id, frame), timeout=0.01)  # Non-blocking queue insertion
+                    self.frame_queue.put(
+                        (source_id, frame), timeout=0.01
+                    )  # Non-blocking queue insertion
                 except queue.Full:
                     pass  # Drop frame if queue is full to prevent memory buildup
                 time.sleep(0.05)  # Throttle for CPU efficiency
 
             cap.release()
 
-            if self.auto_shutdown and self.active_streams <= 0:  # Check if this was the last active stream
-                LOGGER.info(f"ℹ️ All streams finished. Initiating shutdown...")
-                shutdown_thread = threading.Thread(target=self.delayed_shutdown, daemon=True)
+            if (
+                self.auto_shutdown and self.active_streams <= 0
+            ):  # Check if this was the last active stream
+                LOGGER.info("ℹ️ All streams finished. Initiating shutdown...")
+                shutdown_thread = threading.Thread(
+                    target=self.delayed_shutdown, daemon=True
+                )
                 shutdown_thread.start()
 
         except Exception as e:
@@ -262,7 +289,9 @@ class StreamGrid:
         batch_frames, batch_ids = [], []
 
         while self.running:
-            while len(batch_frames) < self.batch_size:  # Collect frames up to batch_size
+            while (
+                len(batch_frames) < self.batch_size
+            ):  # Collect frames up to batch_size
                 try:
                     source_id, frame = self.frame_queue.get(timeout=0.01)
                     batch_frames.append(frame)
@@ -284,7 +313,9 @@ class StreamGrid:
                         )
 
                         # Update each source with its results
-                        for source_id, frame, result in zip(batch_ids, batch_frames, results):
+                        for source_id, frame, result in zip(
+                            batch_ids, batch_frames, results
+                        ):
                             self.update_source(source_id, frame, result)
                     else:
                         # No model, just display frames
@@ -297,7 +328,11 @@ class StreamGrid:
 
                     if self.batch_times:
                         avg_batch_time = sum(self.batch_times) / len(self.batch_times)
-                        self.prediction_fps = len(batch_frames) / avg_batch_time if avg_batch_time > 0 else 0
+                        self.prediction_fps = (
+                            len(batch_frames) / avg_batch_time
+                            if avg_batch_time > 0
+                            else 0
+                        )
 
                 except Exception as e:
                     LOGGER.error(f"❌ Batch processing error: {e}")
@@ -332,7 +367,7 @@ class StreamGrid:
 
             # Store processed frame and statistics
             self.frames[source_id] = resized
-            self.stats[source_id] = {'detections': detections, 'time': time.time()}
+            self.stats[source_id] = {"detections": detections, "time": time.time()}
 
     def draw_boxes(self, frame, results, orig_shape):
         """Draw YOLO detection boxes and labels on frame.
@@ -389,7 +424,9 @@ class StreamGrid:
 
         # Start capture threads for each source
         for i, source in enumerate(self.sources):
-            thread = threading.Thread(target=self.capture_video, args=(source, i), daemon=True)
+            thread = threading.Thread(
+                target=self.capture_video, args=(source, i), daemon=True
+            )
             thread.start()
 
         # Start batch processing thread
@@ -406,9 +443,11 @@ class StreamGrid:
                 key = cv2.waitKey(1) & 0xFF  # Handle keyboard input.
                 if key == 27:  # ESC key
                     break
-                elif key == ord('s'):  # 's' key
+                elif key == ord("s"):  # 's' key
                     self.show_stats = not self.show_stats
-                    LOGGER.info(f"ℹ️ Stats display: {'ON' if self.show_stats else 'OFF'}")
+                    LOGGER.info(
+                        f"ℹ️ Stats display: {'ON' if self.show_stats else 'OFF'}"
+                    )
         finally:
             self.stop()
             cv2.destroyAllWindows()
@@ -439,14 +478,23 @@ class StreamGrid:
                     for y in range(0, self.cell_h, 20):
                         for x in range(0, self.cell_w, 20):
                             if (x // 20 + y // 20) % 2:
-                                frame[y:y + 20, x:x + 20] = 20
+                                frame[y : y + 20, x : x + 20] = 20
 
                     # Add "WAITING" text
                     text = "WAITING"
                     wait_scale = max(0.4, min(1.0, self.cell_w / 400))
-                    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, wait_scale, 2)
-                    cv2.putText(frame, text, ((self.cell_w - w) // 2, (self.cell_h - h) // 2 + h),
-                                cv2.FONT_HERSHEY_SIMPLEX, wait_scale, (100, 100, 100), 2)
+                    (w, h), _ = cv2.getTextSize(
+                        text, cv2.FONT_HERSHEY_SIMPLEX, wait_scale, 2
+                    )
+                    cv2.putText(
+                        frame,
+                        text,
+                        ((self.cell_w - w) // 2, (self.cell_h - h) // 2 + h),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        wait_scale,
+                        (100, 100, 100),
+                        2,
+                    )
 
                 if self.show_stats:
                     # Add source label with adaptive sizing
@@ -462,17 +510,31 @@ class StreamGrid:
 
                     # Draw colored background for each source
                     bg_color = self.get_color(i)
-                    cv2.rectangle(frame, (2, 2),
-                                  (2 + text_width + padding * 2, 2 + text_height + baseline + padding * 2),
-                                  bg_color, -1)
+                    cv2.rectangle(
+                        frame,
+                        (2, 2),
+                        (
+                            2 + text_width + padding * 2,
+                            2 + text_height + baseline + padding * 2,
+                        ),
+                        bg_color,
+                        -1,
+                    )
 
                     # Use luminance-based contrast for text color
                     r, g, b = bg_color
                     luminance = 0.299 * r + 0.587 * g + 0.114 * b
                     text_color = (0, 0, 0) if luminance > 127 else (255, 255, 255)
 
-                    cv2.putText(frame, info, (2 + padding, 4 + padding + text_height),
-                                cv2.FONT_HERSHEY_SIMPLEX, text_scale, text_color, thickness)
+                    cv2.putText(
+                        frame,
+                        info,
+                        (2 + padding, 4 + padding + text_height),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        text_scale,
+                        text_color,
+                        thickness,
+                    )
 
                 self.grid[y1:y2, x1:x2] = frame  # Place frame in grid.
 
@@ -507,14 +569,24 @@ class StreamGrid:
 
         # Draw background rectangle
         padding = max(20, int(text_scale * 8))
-        cv2.rectangle(self.grid,
-                      (center_x - padding, bottom_y - text_h - padding),
-                      (center_x + text_w + padding, bottom_y + padding),
-                      (255, 255, 255), -1)
+        cv2.rectangle(
+            self.grid,
+            (center_x - padding, bottom_y - text_h - padding),
+            (center_x + text_w + padding, bottom_y + padding),
+            (255, 255, 255),
+            -1,
+        )
 
         # Draw text
-        cv2.putText(self.grid, fps_text, (center_x, bottom_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, text_scale, (104, 31, 17), thickness)
+        cv2.putText(
+            self.grid,
+            fps_text,
+            (center_x, bottom_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            text_scale,
+            (104, 31, 17),
+            thickness,
+        )
 
     def stop(self):
         """Stop all processing and release resources.
@@ -534,7 +606,9 @@ class StreamGrid:
         except:  # noqa: E722
             pass
 
-        for i, thread in enumerate(self.stream_threads):  # Wait for threads to finish (with timeout)
+        for i, thread in enumerate(
+            self.stream_threads
+        ):  # Wait for threads to finish (with timeout)
             thread.join(timeout=0.5)
 
         if self.analytics:
@@ -542,7 +616,9 @@ class StreamGrid:
 
         if self.save and self.video_writer:
             self.video_writer.release()
-            LOGGER.info(f"✅ Video saved as: streamgrid_output_{self.batch_size}_streams.mp4")
+            LOGGER.info(
+                f"✅ Video saved as: streamgrid_output_{self.batch_size}_streams.mp4"
+            )
 
         with self.lock:  # Clear cached frames to free memory
             self.frames.clear()
