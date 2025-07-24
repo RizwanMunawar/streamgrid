@@ -10,7 +10,7 @@ class StreamAnalytics:
     """Simple analytics logger for StreamGrid."""
 
     def __init__(self, output_file="streamgrid_analytics.csv"):
-        """ Initialization method."""
+        """Initialization method."""
         self.output_file = Path(output_file)
         self.start_time = time.time()
 
