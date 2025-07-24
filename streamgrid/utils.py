@@ -2,7 +2,6 @@ import torch
 import logging
 
 
-
 def setup_logger(name, log_file=None):
     """Create a simple logger with console and optional file output."""
     logger = logging.getLogger(name)  # Create logger
