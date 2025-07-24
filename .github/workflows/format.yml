@@ -14,7 +14,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
 
@@ -48,7 +48,7 @@ jobs:
   auto-format:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -68,7 +68,7 @@ jobs:
       run: |
         echo "🔧 Auto-formatting code..."
         black streamgrid/ tests/
-        ruff check streamgrid/ tests/ --fix --unsafe-fixes
+        ruff check streamgrid/ tests/ --fix
 
     - name: Check for changes
       id: verify-changed-files
