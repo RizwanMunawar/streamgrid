@@ -1,3 +1,5 @@
+# StreamGrid - Run Object Detection Across Multiple Streams
+
 import csv
 import time
 from datetime import datetime
@@ -8,6 +10,7 @@ class StreamAnalytics:
     """Simple analytics logger for StreamGrid."""
 
     def __init__(self, output_file="streamgrid_analytics.csv"):
+        """ Initialization method."""
         self.output_file = Path(output_file)
         self.start_time = time.time()
 

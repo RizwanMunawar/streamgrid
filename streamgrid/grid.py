@@ -1,3 +1,5 @@
+# StreamGrid - Run Object Detection Across Multiple Streams
+
 import math
 import time
 import threading
