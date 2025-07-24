@@ -1,0 +1,89 @@
+name: StreamGrid Assistant
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black ruff
+
+    - name: Check formatting with Black
+      run: |
+        echo "🔍 Checking code formatting..."
+        black --check --diff --color streamgrid/ tests/
+      continue-on-error: true  # Add this
+    - name: Lint with Ruff
+      run: |
+        echo "🔍 Running comprehensive linting..."
+        ruff check streamgrid/ tests/ --output-format=github
+      continue-on-error: true  # Add this
+
+    - name: Check docstrings with Ruff
+      run: |
+        echo "🔍 Checking docstrings..."
+        ruff check streamgrid/ tests/ --select=D --output-format=github
+      continue-on-error: true  # Add this
+
+  auto-format:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install tools
+      run: |
+        pip install black ruff
+
+    - name: Auto-format code
+      run: |
+        echo "🔧 Auto-formatting code..."
+        black streamgrid/ tests/
+        ruff check streamgrid/ tests/ --fix
+
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git config --local user.email "streamgrid.assistant@github.com"
+        git config --local user.name "StreamGrid Assistant"
+        git add .
+        git commit -m "⚡ Auto-format with StreamGrid Assistant 🚀"
+        git push
