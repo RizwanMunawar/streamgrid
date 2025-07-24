@@ -31,7 +31,7 @@ class VideoStream:
             self.thread = threading.Thread(target=self._capture_loop, daemon=True)
             self.thread.start()
             return True
-        except:
+        except:  # noqa: E722
             return False
 
     def _capture_loop(self):

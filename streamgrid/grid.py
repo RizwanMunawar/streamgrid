@@ -531,7 +531,7 @@ class StreamGrid:
         try:  # Clear the frame queue to prevent blocking
             while not self.frame_queue.empty():
                 self.frame_queue.get_nowait()
-        except:
+        except:  # noqa: E722
             pass
 
         for i, thread in enumerate(self.stream_threads):  # Wait for threads to finish (with timeout)

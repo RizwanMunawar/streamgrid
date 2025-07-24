@@ -23,7 +23,7 @@ def parse_kv_args(args):
             try:
                 config[k] = ast.literal_eval(v)
                 continue
-            except:
+            except:  # noqa: E722
                 pass
         config[k] = {'true': True, 'false': False}.get(v.lower(),  # Handle other types
                                                        int(v) if v.isdigit() else
