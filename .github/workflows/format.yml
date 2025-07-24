@@ -1,0 +1,83 @@
+name: StreamGrid Assistant
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black ruff
+
+    - name: Check formatting with Black
+      run: |
+        echo "🔍 Checking code formatting..."
+        black --check --diff --color streamgrid/ tests/
+
+    - name: Lint with Ruff
+      run: |
+        echo "🔍 Running comprehensive linting..."
+        ruff check streamgrid/ tests/ --output-format=github
+
+    - name: Check docstrings with Ruff
+      run: |
+        echo "🔍 Checking docstrings..."
+        ruff check streamgrid/ tests/ --select=D --output-format=github
+
+  auto-format:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install tools
+      run: |
+        pip install black ruff
+
+    - name: Auto-format code
+      run: |
+        echo "🔧 Auto-formatting code..."
+        black streamgrid/ tests/
+        ruff check streamgrid/ tests/ --fix --unsafe-fixes
+
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git config --local user.email "streamgrid.assistant@github.com"
+        git config --local user.name "StreamGrid Assistant"
+        git add .
+        git commit -m "🔧 Auto-format code with Black and Ruff"
+        git push
