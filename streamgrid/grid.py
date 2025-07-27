@@ -182,17 +182,6 @@ class StreamGrid:
 
         return local_paths
 
-    def get_color(self, class_idx):
-        """Get color for a given class index.
-
-        Args:
-            class_idx (int): Index of the class/source.
-
-        Returns:
-            tuple: RGB color tuple (r, g, b) with values 0-255.
-        """
-        return tuple(map(int, self.colors[class_idx % len(self.colors)]))
-
     def delayed_shutdown(self):
         """Shutdown after a delay to allow for cleanup."""
         self.running = False
@@ -511,7 +500,7 @@ class StreamGrid:
                     )
 
                     # Draw colored background for each source
-                    bg_color = self.get_color(i)
+                    bg_color = tuple(map(int, self.colors[i % len(self.colors)]))
                     cv2.rectangle(
                         frame,
                         (2, 2),
