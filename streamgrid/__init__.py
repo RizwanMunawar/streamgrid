@@ -9,59 +9,91 @@ from ultralytics import YOLO
 from .grid import StreamGrid
 
 
-def parse_kv_args(args):
-    """Parse key=value arguments into dict."""
-    full_cmd = " ".join(args)
-    import re
+def parse_cli_args(args):
+    """Parse command line arguments efficiently.
 
+    Args:
+        args: List of command line arguments
+
+    Returns:
+        dict: Parsed configuration
+    """
     config = {}
-    kv_pairs = re.findall(r"(\w+)=([^=]+?)(?=\s+\w+=|$)", full_cmd)
-    for k, v in kv_pairs:
-        v = v.strip()
-        if v.startswith("[") and v.endswith("]"):  # Handle Python list literals
-            import ast
 
-            try:
-                config[k] = ast.literal_eval(v)
-                continue
-            except:  # noqa: E722
-                pass
-        config[k] = {"true": True, "false": False}.get(
-            v.lower(),  # Handle other types
-            int(v) if v.isdigit() else float(v) if v.replace(".", "").isdigit() else v,
-        )
+    # Simple key=value parsing
+    for arg in args:
+        if '=' in arg:
+            key, value = arg.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+
+            # Handle different value types
+            if value.lower() in ('true', 'false'):
+                config[key] = value.lower() == 'true'
+            elif value.isdigit():
+                config[key] = int(value)
+            elif value.replace('.', '').isdigit():
+                config[key] = float(value)
+            elif value.startswith('[') and value.endswith(']'):
+                # Handle lists: [item1,item2,item3]
+                import ast
+                try:
+                    config[key] = ast.literal_eval(value)
+                except:
+                    # Fallback: split by comma and clean
+                    items = value[1:-1].split(',')
+                    config[key] = [item.strip().strip('"\'') for item in items if item.strip()]
+            else:
+                config[key] = value.strip('"\'')
+
     return config
 
 
 def main():
     parser = argparse.ArgumentParser(description="StreamGrid")
-    parser.add_argument("args", nargs="*", help="key=value pairs or source paths")
-    config = parse_kv_args(parser.parse_args().args)
-    sources = config.pop("sources", None)  # Process sources
-    if sources and isinstance(sources, str):
-        delimiter = (
-            ";" if ";" in sources else ","
-        )  # Support both comma and semicolon delimiters
-        sources = [
-            s.strip().strip("[]\"'") for s in sources.strip("[]").split(delimiter)
-        ]
+    parser.add_argument(
+        "args",
+        nargs="*",
+        help="Configuration in key=value format"
+    )
 
-    model = None  # Load model
-    if "model" in config and config["model"] != "none":
+    # Parse arguments
+    parsed_args = parser.parse_args()
+    config = parse_cli_args(parsed_args.args)
+
+    # Extract and process sources
+    sources = config.pop("sources", None)
+
+    # Load model if specified
+    model = None
+    model_path = config.pop("model", None)
+    if model_path and model_path.lower() != "none":
         try:
-            model = YOLO(config.pop("model", "yolo11n.pt"))
+            model = YOLO(model_path)
+            print(f"✅ Model loaded: {model_path}")
         except Exception as e:
-            print(f"Model error: {e}")
-            sys.exit(1)
+            print(f"❌ Failed to load model '{model_path}': {e}")
+            return 1
 
-    try:  # Run StreamGrid
+    # Validate sources
+    if sources is None:
+        print("⚠️ No sources specified. Using default webcam (source 0).")
+        sources = [0]
+    elif isinstance(sources, str):
+        sources = [sources]
+
+    try:
+        # Run StreamGrid
         StreamGrid(sources=sources, model=model, **config)
+        return 0
+
     except KeyboardInterrupt:
-        sys.exit(0)
+        print("\n👋 Goodbye!")
+        return 0
     except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+        print(f"❌ Error: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
