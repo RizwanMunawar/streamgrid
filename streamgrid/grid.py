@@ -28,7 +28,7 @@ class StreamGrid:
         self.rows = int(math.ceil(self.max_sources / self.cols))
         self.cell_w, self.cell_h = get_optimal_grid_size(self.max_sources, self.cols)
 
-        # Initialize plotter
+        # Initialize stream plotter
         self.plotter = StreamAnnotator(self.cell_w, self.cell_h)
 
         # Display state
@@ -43,11 +43,11 @@ class StreamGrid:
         self.prediction_fps = 0.0
 
         # Video saving
-        self.video_writer = self._setup_video_writer() if save else None
+        self.video_writer = self.setup_video_writer() if save else None
 
         self.run()
 
-    def _setup_video_writer(self):
+    def setup_video_writer(self):
         """Setup video writer for saving output."""
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         return cv2.VideoWriter(
@@ -55,7 +55,7 @@ class StreamGrid:
             (self.cols * self.cell_w, self.rows * self.cell_h)
         )
 
-    def _process_batch(self):
+    def process_batch(self):
         """Process frames in batches for better performance."""
         while self.running:
             frame_data = self.stream_manager.get_frames(self.max_sources)
@@ -70,22 +70,22 @@ class StreamGrid:
             if self.model:
                 results = self.model.predict(frames, conf=0.25, verbose=False, device=self.device)
                 for source_id, frame, result in zip(ids, frames, results):
-                    self._update_source(source_id, frame, result)
+                    self.update_source(source_id, frame, result)
             else:
                 for source_id, frame in zip(ids, frames):
-                    self._update_source(source_id, frame)
+                    self.update_source(source_id, frame)
 
             # Update performance metrics
-            self._update_fps(len(frames), time.time() - batch_start)
+            self.update_fps(len(frames), time.time() - batch_start)
 
-    def _update_fps(self, frame_count, batch_time):
+    def update_fps(self, frame_count, batch_time):
         """Update FPS calculations."""
         self.batch_times.append(batch_time)
         if self.batch_times:
             avg_time = sum(self.batch_times) / len(self.batch_times)
             self.prediction_fps = frame_count / avg_time if avg_time > 0 else 0
 
-    def _update_source(self, source_id, frame, results=None):
+    def update_source(self, source_id, frame, results=None):
         """Update display with processed frame."""
         if source_id >= self.max_sources:
             return
@@ -110,7 +110,7 @@ class StreamGrid:
             if self.analytics:
                 self.analytics.log(source_id, detections, self.prediction_fps)
 
-    def _update_display(self):
+    def update_display(self):
         """Update the main grid display."""
         self.grid.fill(0)
 
@@ -143,14 +143,14 @@ class StreamGrid:
         self.stream_manager.start()
 
         # Start batch processing
-        threading.Thread(target=self._process_batch, daemon=True).start()
+        threading.Thread(target=self.process_batch, daemon=True).start()
 
         cv2.namedWindow("StreamGrid", cv2.WINDOW_AUTOSIZE)
         LOGGER.info("ℹ️ Running. Press ESC to exit, 's' to toggle stats")
 
         try:
             while self.running:
-                self._update_display()
+                self.update_display()
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27:  # ESC
                     break

@@ -14,13 +14,13 @@ class StreamManager:
     """Manages multiple video streams with threading and queue processing."""
 
     def __init__(self, sources=None):
-        self.sources = sources or self._get_default_videos()
+        self.sources = sources or self.get_default_videos()
         self.frame_queue = queue.Queue(maxsize=max(50, len(self.sources) * 4))
         self.active_streams = len(self.sources)
         self.running = False
         self.lock = threading.Lock()
 
-    def _get_default_videos(self):
+    def get_default_videos(self):
         """Download demo videos if no sources provided."""
         LOGGER.warning("⚠️ No sources provided. Downloading default demo videos.")
 
@@ -51,7 +51,7 @@ class StreamManager:
             paths.append(str(local_path))
         return paths
 
-    def _capture_stream(self, source, source_id):
+    def capture_stream(self, source, source_id):
         """Capture frames from a single stream."""
         try:
             cap = cv2.VideoCapture(source)
@@ -97,7 +97,7 @@ class StreamManager:
         """Start all stream capture threads."""
         self.running = True
         for i, source in enumerate(self.sources):
-            thread = threading.Thread(target=self._capture_stream, args=(source, i), daemon=True)
+            thread = threading.Thread(target=self.capture_stream, args=(source, i), daemon=True)
             thread.start()
 
     def get_frames(self, max_frames=None):
