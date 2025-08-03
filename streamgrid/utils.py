@@ -27,20 +27,6 @@ def setup_logger(name, log_file=None):
     return logger
 
 
-def optimize(model, size=320):
-    """Load YOLO11n with optimizations for slightly better FPS on CPU."""
-    # Standard eval mode
-    model.model.eval()
-    torch.set_grad_enabled(False)
-
-    # Warmup
-    dummy = torch.zeros((1, 3, size, size), dtype=torch.float32, device="cpu")
-    model.predict(dummy, device="cpu", verbose=False)
-
-    LOGGER.info("🚀 Model loaded and optimized for performance")
-    return model
-
-
 def get_optimal_grid_size(source_count, cols):
     """Get optimal cell size based on screen resolution and source count."""
     import math
