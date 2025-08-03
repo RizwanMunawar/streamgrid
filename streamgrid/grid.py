@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from collections import deque
 from .stream import StreamManager
-from .plot import StreamAnnotator
+from .plotting import StreamPlotter
 from .utils import LOGGER, get_optimal_grid_size
 from .analytics import StreamAnalytics
 
@@ -15,9 +15,7 @@ from .analytics import StreamAnalytics
 class StreamGrid:
     """Ultra-fast multi-stream video display with object detection."""
 
-    def __init__(
-        self, sources=None, model=None, save=True, device="cpu", analytics=False
-    ):
+    def __init__(self, sources=None, model=None, save=True, device="cpu", analytics=False):
         # Initialize components
         self.stream_manager = StreamManager(sources)
         self.model = model
@@ -30,13 +28,11 @@ class StreamGrid:
         self.rows = int(math.ceil(self.max_sources / self.cols))
         self.cell_w, self.cell_h = get_optimal_grid_size(self.max_sources, self.cols)
 
-        # Initialize stream plotter
-        self.plotter = StreamAnnotator(self.cell_w, self.cell_h)
+        # Initialize plotter
+        self.plotter = StreamPlotter(self.cell_w, self.cell_h, self.max_sources)
 
         # Display state
-        self.grid = np.zeros(
-            (self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8
-        )
+        self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
         self.frames = {}
         self.show_stats = True
         self.running = False
@@ -55,17 +51,26 @@ class StreamGrid:
         """Setup video writer for saving output."""
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         return cv2.VideoWriter(
-            f"streamgrid_output_{self.max_sources}_streams.mp4",
-            fourcc,
-            30,
-            (self.cols * self.cell_w, self.rows * self.cell_h),
+            f"streamgrid_output_{self.max_sources}_streams.mp4", fourcc, 30,
+            (self.cols * self.cell_w, self.rows * self.cell_h)
         )
 
     def process_batch(self):
-        """Process frames in batches for better performance."""
+        """Process frames in batches with consistent timing."""
+        batch_interval = 0.033  # ~30 FPS processing
+        last_batch_time = time.time()
+
         while self.running:
+            current_time = time.time()
+
+            # Maintain consistent batch processing rate
+            if current_time - last_batch_time < batch_interval:
+                time.sleep(0.001)
+                continue
+
             frame_data = self.stream_manager.get_frames(self.max_sources)
             if not frame_data:
+                time.sleep(0.001)  # Small sleep if no frames
                 continue
 
             batch_start = time.time()
@@ -74,9 +79,7 @@ class StreamGrid:
 
             # Run inference if model available
             if self.model:
-                results = self.model.predict(
-                    frames, conf=0.25, verbose=False, device=self.device, batch=16
-                )
+                results = self.model.predict(frames, conf=0.25, verbose=False, device=self.device)
                 for source_id, frame, result in zip(ids, frames, results):
                     self.update_source(source_id, frame, result)
             else:
@@ -85,6 +88,7 @@ class StreamGrid:
 
             # Update performance metrics
             self.update_fps(len(frames), time.time() - batch_start)
+            last_batch_time = current_time
 
     def update_fps(self, frame_count, batch_time):
         """Update FPS calculations."""
@@ -106,14 +110,10 @@ class StreamGrid:
             detections = 0
             if results and results.boxes is not None:
                 detections = len(results.boxes)
-                resized = self.plotter.draw_detections(
-                    resized, results, frame.shape[:2]
-                )
+                resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
 
             # Add source label
-            resized = self.plotter.draw_source_label(
-                resized, source_id, self.show_stats
-            )
+            resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
 
             # Store processed frame
             self.frames[source_id] = resized
@@ -140,10 +140,8 @@ class StreamGrid:
         # Add FPS overlay
         if self.show_stats:
             self.grid = self.plotter.draw_fps_overlay(
-                self.grid,
-                self.prediction_fps,
-                self.cols * self.cell_w,
-                self.rows * self.cell_h,
+                self.grid, self.prediction_fps,
+                self.cols * self.cell_w, self.rows * self.cell_h
             )
 
         # Display and save
@@ -168,7 +166,7 @@ class StreamGrid:
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27:  # ESC
                     break
-                elif key == ord("s"):
+                elif key == ord('s'):
                     self.show_stats = not self.show_stats
         finally:
             self.stop()
@@ -187,9 +185,7 @@ class StreamGrid:
             self.analytics.summary()
         if self.video_writer:
             self.video_writer.release()
-            LOGGER.info(
-                f"✅ Video saved: streamgrid_output_{self.max_sources}_streams.mp4"
-            )
+            LOGGER.info(f"✅ Video saved: streamgrid_output_{self.max_sources}_streams.mp4")
 
         with self.lock:
             self.frames.clear()
