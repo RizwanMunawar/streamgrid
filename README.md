@@ -22,19 +22,18 @@ pip install streamgrid
 from ultralytics import YOLO
 from streamgrid import StreamGrid
 
-# Use assets videos for testing
+# Load model
 model = YOLO("yolo11n.pt")
+# model = YOLO("yolo11n_openvino_model")  ~2-3x faster
 StreamGrid(model=model)  
 
-# Use your own videos
-sources = ["path/to/video1.mp4", 
-           "path/to/video2.mp4", 
-           "path/to/video3.mp4", 
-           "path/to/video4.mp4"]
-StreamGrid(sources=sources, model=model)
-
 # Inference on GPU
-StreamGrid(sources=sources, device="cuda")
+StreamGrid(
+    sources=[
+        "path/to/video1.mp4", "path/to/video2.mp4", 
+        "path/to/video3.mp4", "path/to/video4.mp4"
+    ], 
+    device="cuda")
 
 # Store stream results in CSV file
 StreamGrid(sources=sources, analytics=True)
