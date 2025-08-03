@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from collections import deque
 from .stream import StreamManager
-from .plotting import StreamPlotter
+from .plotting import StreamAnnotator
 from .utils import LOGGER, get_optimal_grid_size
 from .analytics import StreamAnalytics
 
@@ -28,8 +28,8 @@ class StreamGrid:
         self.rows = int(math.ceil(self.max_sources / self.cols))
         self.cell_w, self.cell_h = get_optimal_grid_size(self.max_sources, self.cols)
 
-        # Initialize plotter
-        self.plotter = StreamPlotter(self.cell_w, self.cell_h, self.max_sources)
+        # Initialize annotator
+        self.plotter = StreamAnnotator(self.cell_w, self.cell_h, self.max_sources)
 
         # Display state
         self.grid = np.zeros((self.rows * self.cell_h, self.cols * self.cell_w, 3), dtype=np.uint8)
