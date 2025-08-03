@@ -68,7 +68,7 @@ class StreamGrid:
 
             # Run inference if model available
             if self.model:
-                results = self.model.predict(frames, conf=0.25, verbose=False, device=self.device)
+                results = self.model.predict(frames, conf=0.25, verbose=False, device=self.device, batch=16)
                 for source_id, frame, result in zip(ids, frames, results):
                     self.update_source(source_id, frame, result)
             else:

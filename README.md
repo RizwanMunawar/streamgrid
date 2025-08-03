@@ -27,7 +27,10 @@ model = YOLO("yolo11n.pt")
 StreamGrid(model=model)  
 
 # Use your own videos
-sources = ["video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4"]
+sources = ["path/to/video1.mp4", 
+           "path/to/video2.mp4", 
+           "path/to/video3.mp4", 
+           "path/to/video4.mp4"]
 StreamGrid(sources=sources, model=model)
 
 # Inference on GPU
