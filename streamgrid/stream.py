@@ -24,7 +24,9 @@ class StreamManager:
         """Download demo videos if no sources provided."""
         LOGGER.warning("⚠️ No sources provided. Downloading default demo videos.")
 
-        base_url = "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
+        base_url = (
+            "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/"
+        )
         videos = ["grid_1.mp4", "grid_2.mp4", "grid_3.mp4", "grid_4.mp4"]
         demo_dir = Path("assets")
         demo_dir.mkdir(exist_ok=True)
@@ -40,7 +42,7 @@ class StreamManager:
                     total_size = int(response.headers.get("content-length", 0))
 
                     with open(local_path, "wb") as f, tqdm(
-                            desc=video, total=total_size, unit="B", unit_scale=True
+                        desc=video, total=total_size, unit="B", unit_scale=True
                     ) as pbar:
                         for chunk in response.iter_content(8192):
                             f.write(chunk)
@@ -90,14 +92,16 @@ class StreamManager:
             with self.lock:
                 self.active_streams -= 1
         finally:
-            if 'cap' in locals():
+            if "cap" in locals():
                 cap.release()
 
     def start(self):
         """Start all stream capture threads."""
         self.running = True
         for i, source in enumerate(self.sources):
-            thread = threading.Thread(target=self.capture_stream, args=(source, i), daemon=True)
+            thread = threading.Thread(
+                target=self.capture_stream, args=(source, i), daemon=True
+            )
             thread.start()
 
     def get_frames(self, max_frames=None):

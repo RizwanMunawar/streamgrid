@@ -22,10 +22,14 @@ class StreamAnalytics:
     def log(self, stream_id, detections=0, fps=0.0):
         """Log frame data to CSV."""
         with open(self.output_file, "a", newline="") as f:
-            csv.writer(f).writerow([
-                datetime.now().strftime("%H:%M:%S"),
-                stream_id, detections, round(fps, 1)
-            ])
+            csv.writer(f).writerow(
+                [
+                    datetime.now().strftime("%H:%M:%S"),
+                    stream_id,
+                    detections,
+                    round(fps, 1),
+                ]
+            )
 
     def summary(self):
         """Print analytics summary."""

@@ -12,8 +12,14 @@ class StreamAnnotator:
         self.cell_w = cell_w
         self.cell_h = cell_h
         self.colors = colors_palette or [
-            (255, 0, 0), (104, 31, 17), (0, 0, 255), (128, 0, 255),
-            (255, 0, 255), (0, 255, 255), (255, 128, 0), (128, 0, 255)
+            (255, 0, 0),
+            (104, 31, 17),
+            (0, 0, 255),
+            (128, 0, 255),
+            (255, 0, 255),
+            (0, 255, 255),
+            (255, 128, 0),
+            (128, 0, 255),
         ]
 
     def draw_detections(self, frame, results, orig_shape):
@@ -47,7 +53,9 @@ class StreamAnnotator:
         # Calculate text dimensions dynamically
         font_scale = 1.2
         thickness = 2
-        (text_w, text_h), baseline = cv2.getTextSize(info, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        (text_w, text_h), baseline = cv2.getTextSize(
+            info, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+        )
 
         # Dynamic rectangle size based on text
         padding = 10
@@ -59,8 +67,15 @@ class StreamAnnotator:
 
         # Text color based on background brightness
         text_color = (0, 0, 0) if sum(bg_color) > 384 else (255, 255, 255)
-        cv2.putText(frame, info, (padding, padding + text_h),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, thickness)
+        cv2.putText(
+            frame,
+            info,
+            (padding, padding + text_h),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            text_color,
+            thickness,
+        )
 
         return frame
 
@@ -72,14 +87,20 @@ class StreamAnnotator:
         for y in range(0, self.cell_h, 20):
             for x in range(0, self.cell_w, 20):
                 if (x // 20 + y // 20) % 2:
-                    frame[y:y + 20, x:x + 20] = 20
+                    frame[y : y + 20, x : x + 20] = 20
 
         # "WAITING" text
         text = "WAITING"
         (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-        cv2.putText(frame, text,
-                    ((self.cell_w - w) // 2, (self.cell_h + h) // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 2)
+        cv2.putText(
+            frame,
+            text,
+            ((self.cell_w - w) // 2, (self.cell_h + h) // 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (100, 100, 100),
+            2,
+        )
 
         return frame
 
@@ -109,20 +130,31 @@ class StreamAnnotator:
         thickness = 3
 
         # Get text dimensions and adjust font scale if text is too big
-        (text_w, text_h), baseline = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        (text_w, text_h), baseline = cv2.getTextSize(
+            fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+        )
 
         # Ensure text fits within circle (leave some margin)
         max_text_width = radius * 1.6  # Allow text to be 70% of circle diameter
         if text_w > max_text_width:
             font_scale = font_scale * (max_text_width / text_w)
             thickness = max(2, int(font_scale * 2))
-            (text_w, text_h), baseline = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+            (text_w, text_h), baseline = cv2.getTextSize(
+                fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
+            )
 
         # Center text in circle
         text_x = center_x - text_w // 2
         text_y = center_y + text_h // 2
 
-        cv2.putText(grid, fps_text, (text_x, text_y),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (104, 31, 17), thickness)
+        cv2.putText(
+            grid,
+            fps_text,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            (104, 31, 17),
+            thickness,
+        )
 
         return grid

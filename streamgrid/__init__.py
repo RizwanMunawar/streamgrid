@@ -47,7 +47,9 @@ def main():
     sources = config.pop("sources", None)
     if sources and isinstance(sources, str):
         delimiter = ";" if ";" in sources else ","
-        sources = [s.strip().strip("[]\"'") for s in sources.strip("[]").split(delimiter)]
+        sources = [
+            s.strip().strip("[]\"'") for s in sources.strip("[]").split(delimiter)
+        ]
 
     # Load model
     model = None
