@@ -1,52 +1,58 @@
 """StreamGrid - Ultra-fast multi-stream video display."""
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 __all__ = ["StreamGrid"]
 
 import argparse
 import sys
+import re
+import ast
 from ultralytics import YOLO
 from .grid import StreamGrid
 
 
-def parse_kv_args(args):
+def parse_args(args):
     """Parse key=value arguments into dict."""
-    full_cmd = " ".join(args)
-    import re
-
     config = {}
-    kv_pairs = re.findall(r"(\w+)=([^=]+?)(?=\s+\w+=|$)", full_cmd)
+    kv_pairs = re.findall(r"(\w+)=([^=]+?)(?=\s+\w+=|$)", " ".join(args))
+
     for k, v in kv_pairs:
         v = v.strip()
-        if v.startswith("[") and v.endswith("]"):  # Handle Python list literals
-            import ast
-
+        # Handle lists
+        if v.startswith("[") and v.endswith("]"):
             try:
                 config[k] = ast.literal_eval(v)
                 continue
-            except:  # noqa: E722
+            except:  # noqa
                 pass
-        config[k] = {"true": True, "false": False}.get(
-            v.lower(),  # Handle other types
-            int(v) if v.isdigit() else float(v) if v.replace(".", "").isdigit() else v,
-        )
+        # Handle booleans and numbers
+        if v.lower() in ("true", "false"):
+            config[k] = v.lower() == "true"
+        elif v.isdigit():
+            config[k] = int(v)
+        elif v.replace(".", "").isdigit():
+            config[k] = float(v)
+        else:
+            config[k] = v
     return config
 
 
 def main():
+    """StreamGrid CLI entry point."""
     parser = argparse.ArgumentParser(description="StreamGrid")
-    parser.add_argument("args", nargs="*", help="key=value pairs or source paths")
-    config = parse_kv_args(parser.parse_args().args)
-    sources = config.pop("sources", None)  # Process sources
+    parser.add_argument("args", nargs="*", help="key=value pairs")
+    config = parse_args(parser.parse_args().args)
+
+    # Process sources
+    sources = config.pop("sources", None)
     if sources and isinstance(sources, str):
-        delimiter = (
-            ";" if ";" in sources else ","
-        )  # Support both comma and semicolon delimiters
+        delimiter = ";" if ";" in sources else ","
         sources = [
             s.strip().strip("[]\"'") for s in sources.strip("[]").split(delimiter)
         ]
 
-    model = None  # Load model
+    # Load model
+    model = None
     if "model" in config and config["model"] != "none":
         try:
             model = YOLO(config.pop("model", "yolo11n.pt"))
@@ -54,7 +60,8 @@ def main():
             print(f"Model error: {e}")
             sys.exit(1)
 
-    try:  # Run StreamGrid
+    # Run StreamGrid
+    try:
         StreamGrid(sources=sources, model=model, **config)
     except KeyboardInterrupt:
         sys.exit(0)
