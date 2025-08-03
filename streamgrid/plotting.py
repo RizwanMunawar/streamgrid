@@ -11,7 +11,7 @@ class StreamAnnotator:
     def __init__(self, cell_w, cell_h, colors_palette=None):
         self.cell_w = cell_w
         self.cell_h = cell_h
-        self.colors = colors_palette or [
+        self.colors = [
             (255, 0, 0),
             (104, 31, 17),
             (0, 0, 255),
