@@ -10,7 +10,7 @@ def get_optimal_grid_size(source_count, cols):
     try:
         from screeninfo import get_monitors
         sw, sh = get_monitors()[0].width, get_monitors()[0].height
-    except:
+    except:  # noqa
         sw, sh = 1920, 1080  # Default fallback
 
     rows = int(math.ceil(source_count / cols))

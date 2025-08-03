@@ -24,7 +24,7 @@ def parse_args(args):
                 config[k] = ast.literal_eval(v)
                 continue
             except:
-                pass
+                pass  # noqa
         # Handle booleans and numbers
         if v.lower() in ("true", "false"):
             config[k] = v.lower() == "true"

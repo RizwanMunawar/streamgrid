@@ -118,5 +118,5 @@ class StreamManager:
         try:
             while not self.frame_queue.empty():
                 self.frame_queue.get_nowait()
-        except:
+        except:  # noqa
             pass
