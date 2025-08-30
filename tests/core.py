@@ -1,8 +1,3 @@
-import pytest
-import os
-import tempfile
-import requests
-import shutil
 from ultralytics import YOLO
 from ultralytics.utils.downloads import safe_download
 from streamgrid import StreamGrid
@@ -14,6 +9,7 @@ video_urls = [
 
 for video in video_urls:
     safe_download(video)
+
 
 def test_usage_code():
     """Test the usage of StreamGrid with real videos."""
@@ -32,4 +28,3 @@ def test_usage_code():
             sg.stop()
         if hasattr(sg, "close"):
             sg.close()
-            
