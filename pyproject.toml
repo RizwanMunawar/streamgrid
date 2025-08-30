@@ -43,6 +43,7 @@ classifiers = [
 
 dependencies = [
     "ultralytics",
+    "tqdm",
 ]
 
 [project.scripts]
