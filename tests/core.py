@@ -7,8 +7,8 @@ from ultralytics import YOLO
 from streamgrid import StreamGrid
 
 video_urls = [
-    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/1.mp4",
-    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/d3.mp4",
+    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/grid_2.mp4",
+    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/grid_3.mp4",
 ]
 
 
