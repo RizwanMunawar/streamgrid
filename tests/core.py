@@ -14,7 +14,7 @@ video_urls = [
 
 @pytest.fixture
 def download_test_videos():
-    """Download real test videos from GitHub releases"""
+    """Download real test videos from GitHub releases."""
     temp_dir = tempfile.mkdtemp(prefix="streamgrid_test_")
     video_paths = []
 
@@ -47,12 +47,7 @@ def download_test_videos():
 
 
 def test_usage_code(download_test_videos):
-    """Test the exact code from documentation"""
-    if len(download_test_videos) != 2:
-        pytest.skip("All 2 videos must be downloaded")
-
-    # This is the exact code from your documentation
-
+    """Test the usage of Streamgrid."
     # Video paths
     paths = ["Video1.mp4", "Video2.mp4"]
     model = YOLO("yolo11n.pt")
