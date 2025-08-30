@@ -180,7 +180,10 @@ class StreamGrid:
 
         try:
             while self.running:
-                self.update_display()
+                has_frame = self.update_display()
+                if not has_frame:
+                    LOGGER.info("ℹ️ All videos ended. Exiting.")
+                    break
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27:  # ESC
                     break
