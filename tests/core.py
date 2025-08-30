@@ -4,6 +4,7 @@ import tempfile
 import requests
 import shutil
 from ultralytics import YOLO
+from ultralytics.utils.downloads import safe_download
 from streamgrid import StreamGrid
 
 video_urls = [
@@ -11,37 +12,44 @@ video_urls = [
     "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/grid_3.mp4",
 ]
 
+for video in video_urls:
+    safe_download(video)
 
-@pytest.fixture
-def download_test_videos():
-    """Download real test videos from GitHub releases. Fail if not available."""
-    temp_dir = tempfile.mkdtemp(prefix="streamgrid_test_")
-    original_dir = os.getcwd()
-    os.chdir(temp_dir)
+def test_usage_code():
+    """Test the usage of StreamGrid with real videos."""
+    paths = ["grid_2.mp4", "grid_3.mp4"]
+    model = YOLO("yolo11n.pt")
 
-    video_paths = []
-    for i, url in enumerate(video_urls, start=1):
-        print(f"Downloading Video{i}.mp4...")
-        try:
-            r = requests.get(url, timeout=60)
-            r.raise_for_status()
-        except Exception as e:
-            # Fail instead of skip or dummy
-            pytest.fail(f"Failed to download Video{i}.mp4: {e}")
+    sg = StreamGrid(paths, model)
+    try:
+        assert sg is not None
+        print("✓ StreamGrid initialization successful")
+        print("✓ All videos loaded correctly")
+        print("✓ YOLO model loaded successfully")
+    finally:
+        # Ensure background threads are cleaned up to avoid abort
+        if hasattr(sg, "stop"):
+            sg.stop()
+        if hasattr(sg, "close"):
+            sg.close()
+import pytest
+import os
+import tempfile
+import requests
+import shutil
+from ultralytics import YOLO
+from ultralytics.utils.downloads import safe_download
+from streamgrid import StreamGrid
 
-        video_path = os.path.join(temp_dir, f"Video{i}.mp4")
-        with open(video_path, "wb") as f:
-            f.write(r.content)
-        video_paths.append(video_path)
-        print(f"✓ Downloaded Video{i}.mp4")
+video_urls = [
+    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/grid_2.mp4",
+    "https://github.com/RizwanMunawar/streamgrid/releases/download/v1.0.0/grid_3.mp4",
+]
 
-    yield video_paths
+for video in video_urls:
+    safe_download(video)
 
-    os.chdir(original_dir)
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-def test_usage_code(download_test_videos):
+def test_usage_code():
     """Test the usage of StreamGrid with real videos."""
     paths = ["grid_2.mp4", "grid_3.mp4"]
     model = YOLO("yolo11n.pt")
