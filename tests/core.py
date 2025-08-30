@@ -43,7 +43,7 @@ def download_test_videos():
 
 def test_usage_code(download_test_videos):
     """Test the usage of StreamGrid with real videos."""
-    paths = ["Video1.mp4", "Video2.mp4"]
+    paths = ["grid_2.mp4", "grid_3.mp4"]
     model = YOLO("yolo11n.pt")
 
     sg = StreamGrid(paths, model)
