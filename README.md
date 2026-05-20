@@ -72,4 +72,4 @@ StreamGrid automatically optimizes performance based on the number of streams:
 
 ## Contributing
 
-We welcome contributions! Please feel free to submit a Pull Request or open an issue for discussion.
+We welcome contributions! Please feel free to submit a [Pull Request](https://github.com/RizwanMunawar/streamgrid/pulls) or open a [discussion](https://github.com/RizwanMunawar/streamgrid/discussions).
