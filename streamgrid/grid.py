@@ -22,12 +22,14 @@ class StreamGrid:
         self, sources=None, model=None, save=False, device="cpu", analytics=False,
         buffer_mode="latest", queue_size=8, capture_fps=None, inference_fps=30,
         display_fps=30, batch_size=0, conf=0.25, imgsz=640, show=True,
-        half=False, metrics_file=None, render=True,
+        half=False, metrics_file=None, render=True, batch_wait_ms=0,
     ):
         if inference_fps < 0 or display_fps <= 0:
             raise ValueError("inference_fps must be nonnegative and display_fps positive")
         if batch_size < 0:
             raise ValueError("batch_size must be nonnegative")
+        if batch_wait_ms < 0:
+            raise ValueError("batch_wait_ms must be nonnegative")
         self.stream_manager = StreamManager(
             sources, buffer_mode=buffer_mode, queue_size=queue_size,
             capture_fps=capture_fps
@@ -38,6 +40,7 @@ class StreamGrid:
         self.inference_fps = inference_fps
         self.display_fps = display_fps
         self.batch_size = batch_size
+        self.batch_wait_ms = batch_wait_ms
         self.conf = conf
         self.imgsz = imgsz
         self.half = half
@@ -90,7 +93,9 @@ class StreamGrid:
                     continue
                 next_run = max(next_run + interval, now)
                 limit = self.batch_size or self.max_sources
-                frame_data = self.stream_manager.get_frames(limit)
+                frame_data = self.stream_manager.get_frames(
+                    limit, timeout=max(0.001, self.batch_wait_ms / 1000)
+                )
                 if not frame_data:
                     if self.stream_manager.finished:
                         break
@@ -122,10 +127,8 @@ class StreamGrid:
     def update_fps(self, frame_count, batch_time):
         self.processed_frames += frame_count
         self.batch_times.append((frame_count, batch_time))
-        total_time = sum(duration for _, duration in self.batch_times)
-        self.prediction_fps = (
-            sum(count for count, _ in self.batch_times) / total_time
-            if total_time > 0 else 0.0
+        self.prediction_fps = self.processed_frames / max(
+            time.monotonic() - self.metrics.started, 1e-9
         )
 
     def update_source(self, source_id, frame, results=None, captured=None):
