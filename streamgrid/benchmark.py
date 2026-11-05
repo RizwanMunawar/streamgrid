@@ -28,6 +28,7 @@ def main(argv=None):
     parser.add_argument("--buffer-mode", choices=["fifo", "latest"], default="fifo")
     parser.add_argument("--queue-size", type=int, default=8)
     parser.add_argument("--half", action="store_true")
+    parser.add_argument("--batch-wait-ms", type=float, default=0)
     parser.add_argument("--output", default="streamgrid_benchmark.json")
     args = parser.parse_args(argv)
 
@@ -38,7 +39,7 @@ def main(argv=None):
         sources=args.sources, model=model, device=args.device,
         buffer_mode=args.buffer_mode, queue_size=args.queue_size,
         batch_size=args.batch_size, inference_fps=args.inference_fps,
-        imgsz=args.imgsz, half=args.half,
+        imgsz=args.imgsz, half=args.half, batch_wait_ms=args.batch_wait_ms,
         show=False, save=False, render=False, metrics_file=str(target)
     )
     if grid.error:
@@ -52,7 +53,8 @@ def main(argv=None):
         "batch_size": args.batch_size or len(args.sources),
         "inference_fps_limit": args.inference_fps,
         "buffer_mode": args.buffer_mode,
-        "half": args.half
+        "half": args.half,
+        "batch_wait_ms": args.batch_wait_ms
     }
     report["wall_seconds"] = round(time.monotonic() - started, 3)
     target.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
