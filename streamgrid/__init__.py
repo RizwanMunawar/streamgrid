@@ -15,7 +15,7 @@ Example:
     python -m streamgrid sources=cam1.mp4,cam2.mp4 model=yolo11n.pt imgsz=640
 """
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 __all__ = ["StreamGrid"]
 
 import argparse
