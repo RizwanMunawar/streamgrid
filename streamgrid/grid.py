@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from .analytics import StreamAnalytics
+from .performance import PerformanceMetrics
 from .plotting import StreamAnnotator
 from .stream import StreamManager
 from .utils import LOGGER, get_optimal_grid_size
@@ -33,11 +34,19 @@ class StreamGrid:
         conf=0.25,
         imgsz=640,
         show=True,
+        half=False,
+        metrics_file=None,
+        render=True,
+        batch_wait_ms=0,
     ):
-        if inference_fps <= 0 or display_fps <= 0:
-            raise ValueError("inference_fps and display_fps must be positive")
+        if inference_fps < 0 or display_fps <= 0:
+            raise ValueError(
+                "inference_fps must be nonnegative and display_fps positive"
+            )
         if batch_size < 0:
             raise ValueError("batch_size must be nonnegative")
+        if batch_wait_ms < 0:
+            raise ValueError("batch_wait_ms must be nonnegative")
         self.stream_manager = StreamManager(
             sources,
             buffer_mode=buffer_mode,
@@ -50,8 +59,13 @@ class StreamGrid:
         self.inference_fps = inference_fps
         self.display_fps = display_fps
         self.batch_size = batch_size
+        self.batch_wait_ms = batch_wait_ms
         self.conf = conf
         self.imgsz = imgsz
+        self.half = half
+        self.metrics_file = metrics_file
+        self.metrics = PerformanceMetrics()
+        self.render = render
         self.show = show
         self.max_sources = len(self.stream_manager.sources)
         self.cols = math.ceil(math.sqrt(self.max_sources))
@@ -90,7 +104,7 @@ class StreamGrid:
 
     def process_batch(self):
         """Infer on distinct source frames; do not block the display thread."""
-        interval = 1.0 / self.inference_fps
+        interval = 1.0 / self.inference_fps if self.inference_fps else 0.0
         next_run = time.monotonic()
         try:
             while self.running:
@@ -100,7 +114,9 @@ class StreamGrid:
                     continue
                 next_run = max(next_run + interval, now)
                 limit = self.batch_size or self.max_sources
-                frame_data = self.stream_manager.get_frames(limit)
+                frame_data = self.stream_manager.get_frames(
+                    limit, timeout=max(0.001, self.batch_wait_ms / 1000)
+                )
                 if not frame_data:
                     if self.stream_manager.finished:
                         break
@@ -114,6 +130,7 @@ class StreamGrid:
                         verbose=False,
                         device=self.device,
                         imgsz=self.imgsz,
+                        half=self.half,
                     )
                     if len(results) != len(frames):
                         raise RuntimeError("Model returned unexpected result count")
@@ -126,6 +143,7 @@ class StreamGrid:
                         self.update_source(source_id, frame, None, captured)
                 elapsed = time.monotonic() - started
                 self.update_fps(len(frames), elapsed)
+                self.metrics.record_batch(elapsed)
         except Exception as exc:  # noqa: BLE001
             self.error = exc
             LOGGER.exception("StreamGrid processing failed")
@@ -135,25 +153,30 @@ class StreamGrid:
     def update_fps(self, frame_count, batch_time):
         self.processed_frames += frame_count
         self.batch_times.append((frame_count, batch_time))
-        total_time = sum(duration for _, duration in self.batch_times)
-        self.prediction_fps = (
-            sum(count for count, _ in self.batch_times) / total_time
-            if total_time > 0
-            else 0.0
+        self.prediction_fps = self.processed_frames / max(
+            time.monotonic() - self.metrics.started, 1e-9
         )
 
     def update_source(self, source_id, frame, results=None, captured=None):
         if source_id >= self.max_sources:
             return
-        resized = cv2.resize(frame, (self.cell_w, self.cell_h))
+        resized = cv2.resize(frame, (self.cell_w, self.cell_h)) if self.render else None
         detections = 0
         if results is not None and results.boxes is not None:
             detections = len(results.boxes)
-            resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
-        resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
+            if self.render:
+                resized = self.plotter.draw_detections(
+                    resized, results, frame.shape[:2]
+                )
+        if self.render:
+            resized = self.plotter.draw_source_label(
+                resized, source_id, self.show_stats
+            )
         latency = 1000 * (time.monotonic() - captured) if captured else 0.0
+        self.metrics.record_frame(source_id, captured)
         with self.lock:
-            self.frames[source_id] = resized
+            if self.render:
+                self.frames[source_id] = resized
             if captured:
                 self.latency_ms.append(latency)
         if self.analytics:
@@ -196,7 +219,7 @@ class StreamGrid:
             next_display = time.monotonic()
             while self.running or (self.worker.is_alive() and not self.error):
                 now = time.monotonic()
-                if now >= next_display:
+                if now >= next_display and (self.show or self.save):
                     self.update_display()
                     next_display = max(next_display + 1.0 / self.display_fps, now)
                 if self.show:
@@ -225,6 +248,12 @@ class StreamGrid:
             and self.worker is not threading.current_thread()
         ):
             self.worker.join(timeout=5.0)
+        if self.metrics_file:
+            self.metrics.export(
+                self.metrics_file,
+                self.stream_manager.decoded,
+                self.stream_manager.dropped,
+            )
         if self.analytics:
             self.analytics.summary()
             self.analytics = None

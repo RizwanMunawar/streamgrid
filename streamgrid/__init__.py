@@ -15,7 +15,7 @@ Example:
     python -m streamgrid sources=cam1.mp4,cam2.mp4 model=yolo11n.pt imgsz=640
 """
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 __all__ = ["StreamGrid"]
 
 import argparse
@@ -121,7 +121,7 @@ def main():
     if "model" in config and config["model"] != "none":
         try:
             model = YOLO(config.pop("model", "yolo11n.pt"))
-        except Exception as e:  # noqa: BLE001  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             print(f"Model error: {e}")
             sys.exit(1)
 

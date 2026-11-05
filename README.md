@@ -59,7 +59,15 @@ streamgrid model=yolo11n.pt sources=["video1.mp4", "video2.mp4"]
 streamgrid model=yolo11n.pt analytics=True
 ```
 
-## Performance (Beta, final benchmarks will be released soon)
+## Performance and reproducible benchmarks
+
+StreamGrid now includes independently paced capture, inference and display, plus per-camera bounded buffers and headless benchmarking. For real-time streams, the default `latest` buffer mode prioritizes fresh frames; `fifo` is available for offline lossless processing. Exported ONNX, OpenVINO, and TensorRT model paths can be loaded through the supported Ultralytics YOLO API. Results depend on hardware, backends, input resolution, batch size, and queue configuration.
+
+Example: `python -m streamgrid.benchmark --sources video1.mp4 video2.mp4 --model yolo11n.pt --buffer-mode fifo --output results.json`
+
+See [Performance Guide](docs/performance.md) for options, metrics, benchmark methodology, and backend compatibility.
+
+## Previous beta performance estimates (not verified against this change)
 
 StreamGrid automatically optimizes performance based on the number of streams:
 
