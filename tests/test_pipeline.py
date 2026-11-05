@@ -1,8 +1,5 @@
 """CPU-only regression tests for per-stream buffering and lifecycle."""
 
-import threading
-import time
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -51,8 +48,11 @@ def test_capture_has_no_fixed_sleep_and_releases_camera():
 
         def read(self):
             self.count += 1
-            return ((True, np.zeros((2, 2, 3), dtype=np.uint8))
-                    if self.count <= 3 else (False, None))
+            return (
+                (True, np.zeros((2, 2, 3), dtype=np.uint8))
+                if self.count <= 3
+                else (False, None)
+            )
 
         def release(self):
             self.released = True
