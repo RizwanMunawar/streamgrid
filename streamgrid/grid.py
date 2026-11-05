@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from .analytics import StreamAnalytics
+from .performance import PerformanceMetrics
 from .plotting import StreamAnnotator
 from .stream import StreamManager
 from .utils import LOGGER, get_optimal_grid_size
@@ -21,6 +22,7 @@ class StreamGrid:
         self, sources=None, model=None, save=False, device="cpu", analytics=False,
         buffer_mode="latest", queue_size=8, capture_fps=None, inference_fps=30,
         display_fps=30, batch_size=0, conf=0.25, imgsz=640, show=True,
+        half=False, metrics_file=None,
     ):
         if inference_fps <= 0 or display_fps <= 0:
             raise ValueError("inference_fps and display_fps must be positive")
@@ -38,6 +40,9 @@ class StreamGrid:
         self.batch_size = batch_size
         self.conf = conf
         self.imgsz = imgsz
+        self.half = half
+        self.metrics_file = metrics_file
+        self.metrics = PerformanceMetrics()
         self.show = show
         self.max_sources = len(self.stream_manager.sources)
         self.cols = math.ceil(math.sqrt(self.max_sources))
@@ -95,7 +100,7 @@ class StreamGrid:
                 if self.model is not None:
                     results = self.model.predict(
                         frames, conf=self.conf, verbose=False, device=self.device,
-                        imgsz=self.imgsz
+                        imgsz=self.imgsz, half=self.half
                     )
                     if len(results) != len(frames):
                         raise RuntimeError("Model returned unexpected result count")
@@ -106,6 +111,7 @@ class StreamGrid:
                         self.update_source(source_id, frame, None, captured)
                 elapsed = time.monotonic() - started
                 self.update_fps(len(frames), elapsed)
+                self.metrics.record_batch(elapsed)
         except Exception as exc:
             self.error = exc
             LOGGER.exception("StreamGrid processing failed")
@@ -131,6 +137,7 @@ class StreamGrid:
             resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
         resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
         latency = 1000 * (time.monotonic() - captured) if captured else 0.0
+        self.metrics.record_frame(source_id, captured)
         with self.lock:
             self.frames[source_id] = resized
             if captured:
@@ -200,6 +207,11 @@ class StreamGrid:
         self.stream_manager.stop()
         if self.worker and self.worker.is_alive() and self.worker is not threading.current_thread():
             self.worker.join(timeout=5.0)
+        if self.metrics_file:
+            self.metrics.export(
+                self.metrics_file, self.stream_manager.decoded,
+                self.stream_manager.dropped
+            )
         if self.analytics:
             self.analytics.summary()
             self.analytics = None
