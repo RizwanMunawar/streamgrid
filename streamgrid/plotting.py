@@ -31,7 +31,9 @@ class StreamAnnotator:
         scale_x = self.cell_w / orig_shape[1]
         scale_y = self.cell_h / orig_shape[0]
 
-        boxes_and_scores = results.boxes.data[:, :6].cpu().numpy()
+        raw_boxes = results.boxes.data
+        columns = [0, 1, 2, 3, 5, 6] if results.boxes.is_track else [0, 1, 2, 3, 4, 5]
+        boxes_and_scores = raw_boxes[:, columns].cpu().numpy()
         boxes = boxes_and_scores[:, :4]
         confs = boxes_and_scores[:, 4]
         classes = boxes_and_scores[:, 5]
