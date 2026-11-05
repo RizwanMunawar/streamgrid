@@ -23,7 +23,8 @@ def main(argv=None):
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch-size", type=int, default=0)
-    parser.add_argument("--inference-fps", type=float, default=30)
+    parser.add_argument("--inference-fps", type=float, default=0,
+                        help="0 disables the inference rate limiter")
     parser.add_argument("--buffer-mode", choices=["fifo", "latest"], default="fifo")
     parser.add_argument("--queue-size", type=int, default=8)
     parser.add_argument("--half", action="store_true")
@@ -38,7 +39,7 @@ def main(argv=None):
         buffer_mode=args.buffer_mode, queue_size=args.queue_size,
         batch_size=args.batch_size, inference_fps=args.inference_fps,
         imgsz=args.imgsz, half=args.half,
-        show=False, save=False, metrics_file=str(target)
+        show=False, save=False, render=False, metrics_file=str(target)
     )
     if grid.error:
         raise RuntimeError("Inference failed") from grid.error
