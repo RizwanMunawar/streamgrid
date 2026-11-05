@@ -87,7 +87,12 @@ class StreamManager:
                 timestamp = time.monotonic()
                 with self.condition:
                     buffer = self.buffers[source_id]
-                    if len(buffer) == buffer.maxlen:
+                    if self.buffer_mode == "fifo":
+                        while self.running and len(buffer) >= buffer.maxlen:
+                            self.condition.wait(timeout=0.05)
+                        if not self.running:
+                            break
+                    elif len(buffer) == buffer.maxlen:
                         self.dropped[source_id] += 1
                     buffer.append((source_id, frame, timestamp))
                     self.decoded[source_id] += 1
@@ -124,6 +129,7 @@ class StreamManager:
                 if self.buffers[index] and len(frames) < limit:
                     frames.append(self.buffers[index].popleft())
             self._cursor = (self._cursor + 1) % count
+            self.condition.notify_all()
             return frames
 
     @property
