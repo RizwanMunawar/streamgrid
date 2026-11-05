@@ -133,7 +133,7 @@ class StreamAnnotator:
         thickness = 3
 
         # Get text dimensions and adjust font scale if text is too big
-        (text_w, text_h), baseline = cv2.getTextSize(
+        (text_w, text_h), _baseline = cv2.getTextSize(
             fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
         )
 
@@ -142,7 +142,7 @@ class StreamAnnotator:
         if text_w > max_text_width:
             font_scale = font_scale * (max_text_width / text_w)
             thickness = max(2, int(font_scale * 2))
-            (text_w, text_h), baseline = cv2.getTextSize(
+            (text_w, text_h), _baseline = cv2.getTextSize(
                 fps_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
             )
 
