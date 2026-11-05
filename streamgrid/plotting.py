@@ -31,9 +31,10 @@ class StreamAnnotator:
         scale_x = self.cell_w / orig_shape[1]
         scale_y = self.cell_h / orig_shape[0]
 
-        boxes = results.boxes.xyxy.cpu().numpy()
-        confs = results.boxes.conf.cpu().numpy()
-        classes = results.boxes.cls.cpu().numpy()
+        boxes_and_scores = results.boxes.data[:, :6].cpu().numpy()
+        boxes = boxes_and_scores[:, :4]
+        confs = boxes_and_scores[:, 4]
+        classes = boxes_and_scores[:, 5]
 
         for box, conf, cls in zip(boxes, confs, classes):
             x1, y1, x2, y2 = (box * [scale_x, scale_y, scale_x, scale_y]).astype(int)
