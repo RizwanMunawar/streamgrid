@@ -65,7 +65,7 @@ def parse_args(args):
             try:
                 config[k] = ast.literal_eval(v)
                 continue
-            except Exception:
+            except (ValueError, SyntaxError):
                 pass
 
         # Handle booleans and numbers
@@ -119,7 +119,7 @@ def main():
     if "model" in config and config["model"] != "none":
         try:
             model = YOLO(config.pop("model", "yolo11n.pt"))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Model error: {e}")
             sys.exit(1)
 
@@ -128,7 +128,7 @@ def main():
         StreamGrid(sources=sources, model=model, **config)
     except KeyboardInterrupt:
         sys.exit(0)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Error: {e}")
         sys.exit(1)
 
