@@ -22,10 +22,10 @@ class StreamGrid:
         self, sources=None, model=None, save=False, device="cpu", analytics=False,
         buffer_mode="latest", queue_size=8, capture_fps=None, inference_fps=30,
         display_fps=30, batch_size=0, conf=0.25, imgsz=640, show=True,
-        half=False, metrics_file=None,
+        half=False, metrics_file=None, render=True,
     ):
-        if inference_fps <= 0 or display_fps <= 0:
-            raise ValueError("inference_fps and display_fps must be positive")
+        if inference_fps < 0 or display_fps <= 0:
+            raise ValueError("inference_fps must be nonnegative and display_fps positive")
         if batch_size < 0:
             raise ValueError("batch_size must be nonnegative")
         self.stream_manager = StreamManager(
@@ -43,6 +43,7 @@ class StreamGrid:
         self.half = half
         self.metrics_file = metrics_file
         self.metrics = PerformanceMetrics()
+        self.render = render
         self.show = show
         self.max_sources = len(self.stream_manager.sources)
         self.cols = math.ceil(math.sqrt(self.max_sources))
@@ -79,7 +80,7 @@ class StreamGrid:
 
     def process_batch(self):
         """Infer on distinct source frames; do not block the display thread."""
-        interval = 1.0 / self.inference_fps
+        interval = 1.0 / self.inference_fps if self.inference_fps else 0.0
         next_run = time.monotonic()
         try:
             while self.running:
@@ -130,16 +131,19 @@ class StreamGrid:
     def update_source(self, source_id, frame, results=None, captured=None):
         if source_id >= self.max_sources:
             return
-        resized = cv2.resize(frame, (self.cell_w, self.cell_h))
+        resized = cv2.resize(frame, (self.cell_w, self.cell_h)) if self.render else None
         detections = 0
         if results is not None and results.boxes is not None:
             detections = len(results.boxes)
-            resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
-        resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
+            if self.render:
+                resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
+        if self.render:
+            resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
         latency = 1000 * (time.monotonic() - captured) if captured else 0.0
         self.metrics.record_frame(source_id, captured)
         with self.lock:
-            self.frames[source_id] = resized
+            if self.render:
+                self.frames[source_id] = resized
             if captured:
                 self.latency_ms.append(latency)
         if self.analytics:
@@ -182,7 +186,7 @@ class StreamGrid:
             next_display = time.monotonic()
             while self.running or (self.worker.is_alive() and not self.error):
                 now = time.monotonic()
-                if now >= next_display:
+                if now >= next_display and (self.show or self.save):
                     self.update_display()
                     next_display = max(next_display + 1.0 / self.display_fps, now)
                 if self.show:
