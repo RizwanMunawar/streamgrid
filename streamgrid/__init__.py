@@ -19,10 +19,12 @@ __version__ = "1.0.10"
 __all__ = ["StreamGrid"]
 
 import argparse
-import sys
-import re
 import ast
+import re
+import sys
+
 from ultralytics import YOLO
+
 from .grid import StreamGrid
 
 

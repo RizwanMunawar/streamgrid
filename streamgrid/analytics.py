@@ -17,10 +17,14 @@ class StreamAnalytics:
         self.pending = 0
 
     def log(self, stream_id, detections=0, fps=0.0):
-        self.writer.writerow([
-            datetime.now().isoformat(timespec="milliseconds"),
-            stream_id, detections, round(fps, 1)
-        ])
+        self.writer.writerow(
+            [
+                datetime.now().isoformat(timespec="milliseconds"),
+                stream_id,
+                detections,
+                round(fps, 1),
+            ]
+        )
         self.pending += 1
         if self.pending >= self.flush_every:
             self.file.flush()
@@ -28,7 +32,9 @@ class StreamAnalytics:
 
     def summary(self):
         self.close()
-        print(f"Analytics: {self.output_file} | Runtime: {time.monotonic() - self.started:.1f}s")
+        print(
+            f"Analytics: {self.output_file} | Runtime: {time.monotonic() - self.started:.1f}s"
+        )
 
     def close(self):
         if not self.file.closed:

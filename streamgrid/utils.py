@@ -1,7 +1,7 @@
 # StreamGrid - Utilities
 
-import math
 import logging
+import math
 
 
 def get_optimal_grid_size(source_count, cols):

@@ -15,7 +15,9 @@ from .utils import LOGGER
 class StreamManager:
     """Decode each source independently without accumulating stale live frames."""
 
-    def __init__(self, sources=None, buffer_mode="latest", queue_size=8, capture_fps=None):
+    def __init__(
+        self, sources=None, buffer_mode="latest", queue_size=8, capture_fps=None
+    ):
         self.sources = sources if sources is not None else self.get_default_videos()
         if not self.sources:
             raise ValueError("At least one video source is required")
@@ -28,8 +30,10 @@ class StreamManager:
         self.buffer_mode = buffer_mode
         self.queue_size = queue_size
         self.capture_fps = capture_fps
-        self.buffers = [deque(maxlen=1 if buffer_mode == "latest" else queue_size)
-                        for _ in self.sources]
+        self.buffers = [
+            deque(maxlen=1 if buffer_mode == "latest" else queue_size)
+            for _ in self.sources
+        ]
         self.ended = [False] * len(self.sources)
         self.dropped = [0] * len(self.sources)
         self.decoded = [0] * len(self.sources)
@@ -53,7 +57,9 @@ class StreamManager:
                     response.raise_for_status()
                     with open(dest, "wb") as output, tqdm(
                         total=int(response.headers.get("content-length", 0)),
-                        unit="B", unit_scale=True, desc=name
+                        unit="B",
+                        unit_scale=True,
+                        desc=name,
                     ) as bar:
                         for chunk in response.iter_content(8192):
                             output.write(chunk)
@@ -110,8 +116,10 @@ class StreamManager:
         self.running = True
         for i, source in enumerate(self.sources):
             worker = threading.Thread(
-                target=self.capture_stream, args=(source, i), daemon=True,
-                name=f"streamgrid-capture-{i}"
+                target=self.capture_stream,
+                args=(source, i),
+                daemon=True,
+                name=f"streamgrid-capture-{i}",
             )
             self.threads.append(worker)
             worker.start()

@@ -19,20 +19,39 @@ class StreamGrid:
     """Display multiple independent video streams and optionally run YOLO inference."""
 
     def __init__(
-        self, sources=None, model=None, save=False, device="cpu", analytics=False,
-        buffer_mode="latest", queue_size=8, capture_fps=None, inference_fps=30,
-        display_fps=30, batch_size=0, conf=0.25, imgsz=640, show=True,
-        half=False, metrics_file=None, render=True, batch_wait_ms=0,
+        self,
+        sources=None,
+        model=None,
+        save=False,
+        device="cpu",
+        analytics=False,
+        buffer_mode="latest",
+        queue_size=8,
+        capture_fps=None,
+        inference_fps=30,
+        display_fps=30,
+        batch_size=0,
+        conf=0.25,
+        imgsz=640,
+        show=True,
+        half=False,
+        metrics_file=None,
+        render=True,
+        batch_wait_ms=0,
     ):
         if inference_fps < 0 or display_fps <= 0:
-            raise ValueError("inference_fps must be nonnegative and display_fps positive")
+            raise ValueError(
+                "inference_fps must be nonnegative and display_fps positive"
+            )
         if batch_size < 0:
             raise ValueError("batch_size must be nonnegative")
         if batch_wait_ms < 0:
             raise ValueError("batch_wait_ms must be nonnegative")
         self.stream_manager = StreamManager(
-            sources, buffer_mode=buffer_mode, queue_size=queue_size,
-            capture_fps=capture_fps
+            sources,
+            buffer_mode=buffer_mode,
+            queue_size=queue_size,
+            capture_fps=capture_fps,
         )
         self.model = model
         self.device = device
@@ -74,8 +93,10 @@ class StreamGrid:
     def setup_video_writer(self):
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(
-            f"streamgrid_output_{self.max_sources}_streams.mp4", fourcc,
-            float(self.display_fps), (self.grid.shape[1], self.grid.shape[0])
+            f"streamgrid_output_{self.max_sources}_streams.mp4",
+            fourcc,
+            float(self.display_fps),
+            (self.grid.shape[1], self.grid.shape[0]),
         )
         if not writer.isOpened():
             raise RuntimeError("Unable to open output video writer")
@@ -104,12 +125,18 @@ class StreamGrid:
                 frames = [entry[1] for entry in frame_data]
                 if self.model is not None:
                     results = self.model.predict(
-                        frames, conf=self.conf, verbose=False, device=self.device,
-                        imgsz=self.imgsz, half=self.half
+                        frames,
+                        conf=self.conf,
+                        verbose=False,
+                        device=self.device,
+                        imgsz=self.imgsz,
+                        half=self.half,
                     )
                     if len(results) != len(frames):
                         raise RuntimeError("Model returned unexpected result count")
-                    for (source_id, frame, captured), result in zip(frame_data, results):
+                    for (source_id, frame, captured), result in zip(
+                        frame_data, results
+                    ):
                         self.update_source(source_id, frame, result, captured)
                 else:
                     for source_id, frame, captured in frame_data:
@@ -138,9 +165,13 @@ class StreamGrid:
         if results is not None and results.boxes is not None:
             detections = len(results.boxes)
             if self.render:
-                resized = self.plotter.draw_detections(resized, results, frame.shape[:2])
+                resized = self.plotter.draw_detections(
+                    resized, results, frame.shape[:2]
+                )
         if self.render:
-            resized = self.plotter.draw_source_label(resized, source_id, self.show_stats)
+            resized = self.plotter.draw_source_label(
+                resized, source_id, self.show_stats
+            )
         latency = 1000 * (time.monotonic() - captured) if captured else 0.0
         self.metrics.record_frame(source_id, captured)
         with self.lock:
@@ -211,12 +242,17 @@ class StreamGrid:
     def stop(self):
         self.running = False
         self.stream_manager.stop()
-        if self.worker and self.worker.is_alive() and self.worker is not threading.current_thread():
+        if (
+            self.worker
+            and self.worker.is_alive()
+            and self.worker is not threading.current_thread()
+        ):
             self.worker.join(timeout=5.0)
         if self.metrics_file:
             self.metrics.export(
-                self.metrics_file, self.stream_manager.decoded,
-                self.stream_manager.dropped
+                self.metrics_file,
+                self.stream_manager.decoded,
+                self.stream_manager.dropped,
             )
         if self.analytics:
             self.analytics.summary()

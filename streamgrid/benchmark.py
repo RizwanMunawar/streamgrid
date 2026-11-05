@@ -18,13 +18,20 @@ from .grid import StreamGrid
 def main(argv=None):
     parser = argparse.ArgumentParser(description="StreamGrid reproducible benchmark")
     parser.add_argument("--sources", nargs="+", required=True)
-    parser.add_argument("--model", default="none",
-                        help="YOLO checkpoint or exported ONNX/OpenVINO/TensorRT model")
+    parser.add_argument(
+        "--model",
+        default="none",
+        help="YOLO checkpoint or exported ONNX/OpenVINO/TensorRT model",
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch-size", type=int, default=0)
-    parser.add_argument("--inference-fps", type=float, default=0,
-                        help="0 disables the inference rate limiter")
+    parser.add_argument(
+        "--inference-fps",
+        type=float,
+        default=0,
+        help="0 disables the inference rate limiter",
+    )
     parser.add_argument("--buffer-mode", choices=["fifo", "latest"], default="fifo")
     parser.add_argument("--queue-size", type=int, default=8)
     parser.add_argument("--half", action="store_true")
@@ -36,11 +43,20 @@ def main(argv=None):
     target = Path(args.output)
     started = time.monotonic()
     grid = StreamGrid(
-        sources=args.sources, model=model, device=args.device,
-        buffer_mode=args.buffer_mode, queue_size=args.queue_size,
-        batch_size=args.batch_size, inference_fps=args.inference_fps,
-        imgsz=args.imgsz, half=args.half, batch_wait_ms=args.batch_wait_ms,
-        show=False, save=False, render=False, metrics_file=str(target)
+        sources=args.sources,
+        model=model,
+        device=args.device,
+        buffer_mode=args.buffer_mode,
+        queue_size=args.queue_size,
+        batch_size=args.batch_size,
+        inference_fps=args.inference_fps,
+        imgsz=args.imgsz,
+        half=args.half,
+        batch_wait_ms=args.batch_wait_ms,
+        show=False,
+        save=False,
+        render=False,
+        metrics_file=str(target),
     )
     if grid.error:
         raise RuntimeError("Inference failed") from grid.error
@@ -54,7 +70,7 @@ def main(argv=None):
         "inference_fps_limit": args.inference_fps,
         "buffer_mode": args.buffer_mode,
         "half": args.half,
-        "batch_wait_ms": args.batch_wait_ms
+        "batch_wait_ms": args.batch_wait_ms,
     }
     report["wall_seconds"] = round(time.monotonic() - started, 3)
     target.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

@@ -29,6 +29,7 @@ def test_fifo_has_no_implicit_overwrite():
 
 def test_configuration_validation():
     import pytest
+
     with pytest.raises(ValueError):
         StreamManager(["a"], buffer_mode="unknown")
     with pytest.raises(ValueError):
