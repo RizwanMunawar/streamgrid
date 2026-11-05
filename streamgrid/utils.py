@@ -1,7 +1,7 @@
 # StreamGrid - Utilities
 
-import math
 import logging
+import math
 
 
 def get_optimal_grid_size(source_count, cols):
@@ -14,7 +14,7 @@ def get_optimal_grid_size(source_count, cols):
     except:  # noqa
         sw, sh = 1920, 1080  # Default fallback
 
-    rows = int(math.ceil(source_count / cols))
+    rows = math.ceil(source_count / cols)
     cw, ch = int(sw * 0.95) // cols, int(sh * 0.90) // rows
 
     # Maintain 16:9 aspect ratio
