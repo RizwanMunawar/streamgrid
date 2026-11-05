@@ -1,5 +1,6 @@
 from ultralytics import YOLO
 from ultralytics.utils.downloads import safe_download
+
 from streamgrid import StreamGrid
 
 video_urls = [

@@ -18,17 +18,31 @@ class StreamGrid:
     """Display multiple independent video streams and optionally run YOLO inference."""
 
     def __init__(
-        self, sources=None, model=None, save=False, device="cpu", analytics=False,
-        buffer_mode="latest", queue_size=8, capture_fps=None, inference_fps=30,
-        display_fps=30, batch_size=0, conf=0.25, imgsz=640, show=True,
+        self,
+        sources=None,
+        model=None,
+        save=False,
+        device="cpu",
+        analytics=False,
+        buffer_mode="latest",
+        queue_size=8,
+        capture_fps=None,
+        inference_fps=30,
+        display_fps=30,
+        batch_size=0,
+        conf=0.25,
+        imgsz=640,
+        show=True,
     ):
         if inference_fps <= 0 or display_fps <= 0:
             raise ValueError("inference_fps and display_fps must be positive")
         if batch_size < 0:
             raise ValueError("batch_size must be nonnegative")
         self.stream_manager = StreamManager(
-            sources, buffer_mode=buffer_mode, queue_size=queue_size,
-            capture_fps=capture_fps
+            sources,
+            buffer_mode=buffer_mode,
+            queue_size=queue_size,
+            capture_fps=capture_fps,
         )
         self.model = model
         self.device = device
@@ -65,8 +79,10 @@ class StreamGrid:
     def setup_video_writer(self):
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(
-            f"streamgrid_output_{self.max_sources}_streams.mp4", fourcc,
-            float(self.display_fps), (self.grid.shape[1], self.grid.shape[0])
+            f"streamgrid_output_{self.max_sources}_streams.mp4",
+            fourcc,
+            float(self.display_fps),
+            (self.grid.shape[1], self.grid.shape[0]),
         )
         if not writer.isOpened():
             raise RuntimeError("Unable to open output video writer")
@@ -93,12 +109,17 @@ class StreamGrid:
                 frames = [entry[1] for entry in frame_data]
                 if self.model is not None:
                     results = self.model.predict(
-                        frames, conf=self.conf, verbose=False, device=self.device,
-                        imgsz=self.imgsz
+                        frames,
+                        conf=self.conf,
+                        verbose=False,
+                        device=self.device,
+                        imgsz=self.imgsz,
                     )
                     if len(results) != len(frames):
                         raise RuntimeError("Model returned unexpected result count")
-                    for (source_id, frame, captured), result in zip(frame_data, results):
+                    for (source_id, frame, captured), result in zip(
+                        frame_data, results
+                    ):
                         self.update_source(source_id, frame, result, captured)
                 else:
                     for source_id, frame, captured in frame_data:
@@ -117,7 +138,8 @@ class StreamGrid:
         total_time = sum(duration for _, duration in self.batch_times)
         self.prediction_fps = (
             sum(count for count, _ in self.batch_times) / total_time
-            if total_time > 0 else 0.0
+            if total_time > 0
+            else 0.0
         )
 
     def update_source(self, source_id, frame, results=None, captured=None):
@@ -197,7 +219,11 @@ class StreamGrid:
     def stop(self):
         self.running = False
         self.stream_manager.stop()
-        if self.worker and self.worker.is_alive() and self.worker is not threading.current_thread():
+        if (
+            self.worker
+            and self.worker.is_alive()
+            and self.worker is not threading.current_thread()
+        ):
             self.worker.join(timeout=5.0)
         if self.analytics:
             self.analytics.summary()
