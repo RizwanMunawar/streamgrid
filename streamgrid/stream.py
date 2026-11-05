@@ -92,7 +92,7 @@ class StreamManager:
                     buffer.append((source_id, frame, timestamp))
                     self.decoded[source_id] += 1
                     self.condition.notify_all()
-        except Exception:
+        except Exception:  # noqa: BLE001
             LOGGER.exception("Capture failed for source %s", source)
         finally:
             if cap is not None:
