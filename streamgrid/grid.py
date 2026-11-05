@@ -101,7 +101,6 @@ class StreamGrid:
                         break
                     continue
                 started = time.monotonic()
-                ids = [entry[0] for entry in frame_data]
                 frames = [entry[1] for entry in frame_data]
                 if self.model is not None:
                     results = self.model.predict(
@@ -118,7 +117,7 @@ class StreamGrid:
                 elapsed = time.monotonic() - started
                 self.update_fps(len(frames), elapsed)
                 self.metrics.record_batch(elapsed)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.error = exc
             LOGGER.exception("StreamGrid processing failed")
         finally:
