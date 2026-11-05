@@ -120,8 +120,16 @@ class StreamManager:
         """Return at most one frame per stream, round-robin, with capture timestamps."""
         limit = max_frames or len(self.sources)
         with self.condition:
-            if not any(self.buffers) and self.running and not all(self.ended):
-                self.condition.wait(timeout=timeout)
+            deadline = time.monotonic() + timeout
+            target = min(limit, sum(not ended for ended in self.ended))
+            while self.running and not all(self.ended):
+                ready = sum(bool(buffer) for buffer in self.buffers)
+                if ready >= max(1, target):
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self.condition.wait(timeout=remaining)
             frames = []
             count = len(self.sources)
             for step in range(count):
